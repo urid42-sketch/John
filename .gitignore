@@ -4,3 +4,7 @@ __pycache__/
 .env
 frontend/build/
 backend/.venv/
+
+# Local Claude memory (never pushed to this shared repo)
+MEMORY.md
+memory-system/local/
