@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Heebo', system-ui, sans-serif;
+  --font-serif: 'Frank Ruhl Libre', 'Heebo', serif;
+  --color-cream: #f7f1ec;
+  --color-paper: #fffdfb;
+  --color-line: #e9ddd4;
+  --color-ink: #3b302c;
+  --color-muted: #8b7b73;
+  --color-rose: #b9797c;
+  --color-rose-deep: #9a5d62;
+  --color-rose-soft: #f1dfdc;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+button { cursor: pointer; }
+input[type='range'] { accent-color: var(--color-rose); }
+
+.checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #efe6df 25%, transparent 25%, transparent 75%, #efe6df 75%),
+    linear-gradient(45deg, #efe6df 25%, transparent 25%, transparent 75%, #efe6df 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 48px; padding: 0 1.25rem; border-radius: 999px;
+  font-weight: 500; transition: background 0.15s, opacity 0.15s;
+}
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn-primary { background: var(--color-rose); color: #fff; }
+.btn-primary:active { background: var(--color-rose-deep); }
+.btn-ghost { background: var(--color-paper); color: var(--color-ink); border: 1px solid var(--color-line); }
+.btn-ghost:active { background: var(--color-rose-soft); }
+.chip {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 1rem; border-radius: 999px;
+  border: 1px solid var(--color-line); background: var(--color-paper); color: var(--color-ink);
+  font-size: 0.9rem; white-space: nowrap;
+}
+.chip[aria-pressed='true'] { background: var(--color-rose); border-color: var(--color-rose); color: #fff; }
+.safe-b { padding-bottom: env(safe-area-inset-bottom); }
+.safe-t { padding-top: env(safe-area-inset-top); }

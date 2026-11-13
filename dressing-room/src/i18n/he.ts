@@ -1,0 +1,96 @@
+import type { Category, Season } from '../db/types';
+
+export const USER_NAME = 'איה';
+
+export const he = {
+  appName: 'חדר הלבשה',
+  nav: { tryon: 'מדידה', wardrobe: 'ארון', studio: 'סטודיו', looks: 'לוקים' },
+  common: {
+    save: 'שמירה', cancel: 'ביטול', back: 'חזרה', next: 'המשך', delete: 'מחיקה', close: 'סגירה',
+    undo: 'בטל', loading: 'רגע…', retry: 'ניסיון נוסף', done: 'סיום', edit: 'עריכה', soon: 'בקרוב',
+  },
+  welcome: {
+    title: `ברוכה הבאה, ${USER_NAME}`,
+    body: 'זה חדר ההלבשה הפרטי שלך. נתחיל מתמונה אחת שלך, ומשם אפשר למדוד כל בגד שתרצי.',
+    tipsTitle: 'לתמונה מוצלחת',
+    tips: ['עמדי ישר מול המצלמה, גוף מלא', 'ידיים מעט רחוקות מהגוף', 'בגד צמוד ורקע פשוט'],
+    addPhoto: 'העלאת תמונה שלי',
+    privacy: 'הכול נשמר רק בטלפון שלך. שום דבר לא עולה לרשת.',
+  },
+  dolls: {
+    title: 'הבובות שלי', add: 'תמונה חדשה', setDefault: 'בחירה כראשית', isDefault: 'ראשית',
+    namePlaceholder: 'שם לתנוחה (למשל: עומדת ישר)', defaultName: 'התמונה שלי',
+    deleteConfirm: 'למחוק את התמונה הזו?', empty: 'עדיין אין תמונה. נוסיף אחת?',
+    choose: 'בחירת בובה',
+  },
+  categories: {
+    dress: 'שמלות', top: 'חולצות', pants: 'מכנסיים', skirt: 'חצאיות', shoes: 'נעליים', accessory: 'אביזרים',
+  } satisfies Record<Category, string>,
+  categoryOne: {
+    dress: 'שמלה', top: 'חולצה', pants: 'מכנסיים', skirt: 'חצאית', shoes: 'נעליים', accessory: 'אביזר',
+  } satisfies Record<Category, string>,
+  tags: {
+    color: 'צבע', occasion: 'אירוע', season: 'עונה',
+    colors: ['שחור', 'לבן', 'בז׳', 'אדום', 'ורוד', 'כחול', 'ירוק', 'צהוב', 'סגול', 'חום', 'אפור', 'צבעוני'],
+    occasions: ['יומיומי', 'עבודה', 'ערב', 'חגיגי', 'ים', 'ספורט'],
+    seasons: { summer: 'קיץ', winter: 'חורף', spring: 'אביב', autumn: 'סתיו' } satisfies Record<Season, string>,
+  },
+  wardrobe: {
+    title: 'הארון שלי', all: 'הכול', add: 'הוספת בגד', empty: 'הארון עוד ריק',
+    emptyHint: 'מוסיפים בגד מהגלריה, בהדבקה או מקישור.', noMatch: 'אין פריטים שמתאימים לסינון',
+    filters: 'סינון', clearFilters: 'ניקוי סינון',
+  },
+  garment: {
+    tryOn: 'למדידה', name: 'שם', namePlaceholder: 'למשל: שמלת סאטן ירוקה', category: 'קטגוריה',
+    deleteConfirm: 'למחוק את הפריט מהארון?', saved: 'נשמר', added: 'נוסף לארון', deleted: 'הפריט נמחק',
+    notFound: 'הפריט לא נמצא',
+  },
+  import: {
+    titleGarment: 'בגד חדש', titleDoll: 'תמונה חדשה',
+    paste: 'הדבקה', pasteHint: 'העתיקי תמונה (לחיצה ארוכה ← העתק) ואז לחצי כאן',
+    gallery: 'מהגלריה', camera: 'צילום', link: 'קישור לתמונה', linkPlaceholder: 'https://…',
+    linkGo: 'הבאת התמונה', drop: 'אפשר גם לגרור לכאן תמונה',
+    pasteAreaHint: 'אם הכפתור לא עובד: לחיצה ארוכה כאן ← הדבק',
+    cropTitle: 'חיתוך', cropHint: 'גררי את הפינות כך שרק הבגד יישאר', cropHintDoll: 'גררי את הפינות סביב הגוף',
+    cutoutTitle: 'הסרת רקע', metaTitle: 'פרטים',
+    erase: 'מחיקה', restore: 'שחזור', brush: 'גודל מברשת', auto: 'אוטומטי', plainBg: 'רקע אחיד',
+    resetMask: 'איפוס', zoomHint: 'שתי אצבעות להגדלה ולהזזה',
+    removing: 'מסירה את הרקע…',
+    firstRun: 'מורידה את כלי הסרת הרקע. זה קורה פעם אחת בלבד (כ־80MB), מומלץ Wi‑Fi.',
+    saving: 'שומרת…',
+  },
+  errors: {
+    generic: 'משהו השתבש. נסי שוב.',
+    notImage: 'הקובץ הזה אינו תמונה.',
+    decode: 'לא הצלחתי לפתוח את התמונה. נסי קובץ אחר (JPG או PNG).',
+    clipboardEmpty: 'אין תמונה בלוח. העתיקי תמונה ונסי שוב.',
+    clipboardDenied: 'אין גישה ללוח. לחצי לחיצה ארוכה על האזור המקווקו ובחרי ״הדבק״.',
+    badUrl: 'הקישור לא נראה תקין. הוא צריך להתחיל ב־https://',
+    pinterest: 'פינטרסט חוסם קישורים. פתחי את התמונה, לחצי עליה לחיצה ארוכה ← ״העתק תמונה״, חזרי לכאן ולחצי ״הדבקה״.',
+    cors: 'האתר חוסם הורדה ישירה. לחצי לחיצה ארוכה על התמונה ← ״העתק״ (או שמרי אותה לגלריה), חזרי לכאן ולחצי ״הדבקה״.',
+    urlNotImage: 'הקישור מוביל לדף ולא לתמונה. העתיקי את התמונה עצמה והדביקי כאן.',
+    bgFailed: 'ההסרה האוטומטית לא הצליחה. אפשר לנסות ״רקע אחיד״ או לתקן עם המברשת.',
+    quota: 'נגמר המקום בטלפון. כדאי לפנות מקום ולנסות שוב.',
+    saveFailed: 'השמירה נכשלה. נסי שוב.',
+    loadFailed: 'הטעינה נכשלה. נסי לרענן את העמוד.',
+    emptyCutout: 'לא נשאר כלום מהתמונה. שחזרי חלק עם המברשת.',
+  },
+  tryon: {
+    openWardrobe: 'בגדים', emptyWardrobe: 'עדיין אין בגדים בארון', toWardrobe: 'לארון',
+    forward: 'קדימה', backward: 'אחורה', flip: 'היפוך', duplicate: 'שכפול', remove: 'הסרה',
+    tune: 'כוונון', size: 'גודל', rotate: 'סיבוב', width: 'רוחב', clear: 'ניקוי הכול', clearConfirm: 'להסיר את כל הבגדים מהדמות?',
+    missing: 'פריט אחד או יותר נמחק מהארון והוסר מהמדידה',
+    hint: 'גרירה להזזה · שתי אצבעות לגודל ולסיבוב',
+  },
+  settings: {
+    title: 'הגדרות', dolls: 'הבובות שלי', storage: 'אחסון',
+    persisted: 'האחסון מוגן ממחיקה אוטומטית', notPersisted: 'האחסון אינו מוגן עדיין',
+    usage: (used: string, total: string) => `בשימוש ${used} מתוך ${total}`,
+    installTitle: 'התקנה למסך הבית',
+    installBody: 'בספארי: כפתור השיתוף ← ״הוסף למסך הבית״. כך האפליקציה נפתחת במסך מלא והתוכן נשמר לאורך זמן.',
+    installWarn: 'חשוב: כדאי להתקין לפני שמוסיפים תמונות, כי התוכן בספארי ובאפליקציה המותקנת נשמר בנפרד.',
+    backupSoon: 'גיבוי ושחזור יתווספו בקרוב.',
+  },
+  soon: { studio: 'הסטודיו בדרך', studioBody: 'כאן אפשר יהיה לעצב בגדים מאפס ולערוך בגדים קיימים.',
+    looks: 'הלוקים בדרך', looksBody: 'כאן יישמרו הלוקים שתרכיבי, עם מועדפים והשוואה.' },
+};
