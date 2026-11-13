@@ -21,6 +21,10 @@ Stage 1 state and deviations from ARCHITECTURE.md:
   runs serialized, asks consent before the first 80MB download, and skips auto-run after a crashed run.
 - Repos are one file (`db/repo.ts`). No Zustand yet (add with the studio store). `GarmentBody` is raster-only.
 - Not built yet: doll calibration (stage 2), looks/backup/PWA (stage 4). Studio and Looks tabs are placeholders.
+- Try-on backdrop: one closet-room illustration, `public/closet.svg`, applied by CSS (`.closet-bg`) behind the
+  transparent Konva canvas; the doll stands on its rug (see `L` in TryOnStage). Stage 4 look export must draw it too.
+- The user's goal is a REALISTIC result. The overlay try-on is the fast/free mode; realism comes from the
+  AI try-on (stage 5), which the user should be asked to approve early rather than treated as optional.
 - NOT verified in the sandbox (model CDN blocked): a real @imgly model run. Needs a check on the phone,
   together with a 48MP photo import and long-press paste.
 

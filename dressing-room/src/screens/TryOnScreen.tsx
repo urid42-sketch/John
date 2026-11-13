@@ -183,7 +183,7 @@ export function TryOnScreen() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="relative min-h-0 flex-1">
+      <div className="closet-bg relative min-h-0 flex-1 overflow-hidden">
         <TryOnStage
           doll={doll} items={items} garments={garments}
           selectedId={selectedId} onSelect={setSelectedId} onChange={update}

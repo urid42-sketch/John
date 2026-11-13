@@ -88,7 +88,9 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
   const area = useRef<HTMLDivElement>(null);
   const fit = useFit(area, doll.w, doll.h);
   const dollImg = useHtmlImage(doll.cutout);
-  const L: Layout = { ox: (fit.cw - fit.width) / 2, oy: (fit.ch - fit.height) / 2, dw: fit.width, dh: fit.height };
+  // Leave headroom and stand her on the rug of the backdrop instead of filling the whole stage.
+  const dw = fit.width * 0.9, dh = fit.height * 0.9;
+  const L: Layout = { ox: (fit.cw - dw) / 2, oy: fit.ch * 0.955 - dh, dw, dh };
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.z - b.z), [items]);
   const used = useMemo(

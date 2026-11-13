@@ -52,3 +52,6 @@ input[type='range'] { accent-color: var(--color-rose); }
 .chip[aria-pressed='true'] { background: var(--color-rose); border-color: var(--color-rose); color: #fff; }
 .safe-b { padding-bottom: env(safe-area-inset-bottom); }
 .safe-t { padding-top: env(safe-area-inset-top); }
+
+/* The dressing-room backdrop behind the doll (the Konva canvas above it is transparent). */
+.closet-bg { background: #f1e8df url('/closet.svg') center bottom / cover no-repeat; }
