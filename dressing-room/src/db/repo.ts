@@ -94,8 +94,10 @@ export async function getDraft(): Promise<Look> {
 }
 
 export async function saveDraft(dollId: ID | null, items: PlacedItem[]): Promise<void> {
-  const prev = await getDraft();
-  await db.looks.put({ ...prev, dollId, items, updatedAt: Date.now() });
+  await db.transaction('rw', db.looks, async () => {
+    const prev = await getDraft();
+    await db.looks.put({ ...prev, dollId, items, updatedAt: Date.now() });
+  });
 }
 
 /** Default placement per category, relative to the doll (centre y, height fraction). */
@@ -118,6 +120,8 @@ export function newPlacedItem(g: Pick<Garment, 'id' | 'category'>, existing: Pla
 }
 
 export async function addToDraft(g: Garment): Promise<void> {
-  const d = await getDraft();
-  await saveDraft(d.dollId, [...d.items, newPlacedItem(g, d.items)]);
+  await db.transaction('rw', db.looks, async () => {
+    const d = await getDraft();
+    await db.looks.put({ ...d, items: [...d.items, newPlacedItem(g, d.items)], updatedAt: Date.now() });
+  });
 }

@@ -24,13 +24,15 @@ export async function decodeToCanvas(blob: Blob, maxSide: number): Promise<HTMLC
   if (blob.type && !blob.type.startsWith('image/')) throw new ImageError('notImage');
   let src: ImageBitmap | HTMLImageElement;
   let sw: number, sh: number;
+  // <img> first: it applies EXIF orientation everywhere and lets the browser decode a huge
+  // camera photo at reduced size, instead of a full-resolution bitmap (≈195MB for 48MP).
   try {
-    const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' });
-    src = bmp; sw = bmp.width; sh = bmp.height;
+    const img = await loadImage(blob);
+    src = img; sw = img.naturalWidth; sh = img.naturalHeight;
   } catch {
     try {
-      const img = await loadImage(blob);
-      src = img; sw = img.naturalWidth; sh = img.naturalHeight;
+      const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+      src = bmp; sw = bmp.width; sh = bmp.height;
     } catch { throw new ImageError('decode'); }
   }
   if (!sw || !sh) throw new ImageError('decode');
@@ -39,7 +41,7 @@ export async function decodeToCanvas(blob: Blob, maxSide: number): Promise<HTMLC
   const ctx = ctx2d(c);
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(src, 0, 0, w, h);
-  if ('close' in src) src.close();
+  if ('close' in src) src.close(); else src.src = '';
   return c;
 }
 

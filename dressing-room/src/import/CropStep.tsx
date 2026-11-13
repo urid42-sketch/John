@@ -14,7 +14,7 @@ export function CropStep({ source, hint, onDone }: {
   const view = useRef<HTMLCanvasElement>(null);
   const fit = useFit(area, source.width, source.height);
   const [box, setBox] = useState<Box>({ x0: 0, y0: 0, x1: 1, y1: 1 });
-  const drag = useRef<{ h: Handle; px: number; py: number; start: Box } | null>(null);
+  const drag = useRef<{ id: number; h: Handle; px: number; py: number; start: Box } | null>(null);
 
   useEffect(() => {
     const c = view.current;
@@ -23,16 +23,18 @@ export function CropStep({ source, hint, onDone }: {
     c.width = Math.round(source.width * s);
     c.height = Math.round(source.height * s);
     ctx2d(c).drawImage(source, 0, 0, c.width, c.height);
+    return () => { c.width = 0; c.height = 0; };
   }, [source]);
 
   const down = (h: Handle) => (e: RPointerEvent) => {
     e.stopPropagation();
+    if (drag.current && !e.isPrimary) return; // one finger at a time
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { h, px: e.clientX, py: e.clientY, start: box };
+    drag.current = { id: e.pointerId, h, px: e.clientX, py: e.clientY, start: box };
   };
   const move = (e: RPointerEvent) => {
     const d = drag.current;
-    if (!d || !fit.width) return;
+    if (!d || d.id !== e.pointerId || !fit.width) return;
     const dx = (e.clientX - d.px) / fit.width, dy = (e.clientY - d.py) / fit.height;
     const b = { ...d.start };
     const cl = (v: number) => Math.min(1, Math.max(0, v));
@@ -46,7 +48,7 @@ export function CropStep({ source, hint, onDone }: {
     }
     setBox(b);
   };
-  const up = () => { drag.current = null; };
+  const up = (e: RPointerEvent) => { if (drag.current?.id === e.pointerId) drag.current = null; };
 
   const finish = () => {
     const changed = box.x0 > 0.005 || box.y0 > 0.005 || box.x1 < 0.995 || box.y1 < 0.995;

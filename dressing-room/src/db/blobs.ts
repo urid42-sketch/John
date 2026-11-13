@@ -31,8 +31,7 @@ async function acquire(id: BlobRef): Promise<string | null> {
   }
   let p = pending.get(id);
   if (!p) {
-    p = getBlob(id).then((b) => {
-      pending.delete(id);
+    p = getBlob(id).finally(() => pending.delete(id)).then((b) => {
       if (!b) return null;
       const url = URL.createObjectURL(b);
       cache.set(id, { url, refs: 0 });
@@ -63,6 +62,7 @@ export function useBlobUrl(id: BlobRef | undefined | null): string | null {
   const [url, setUrl] = useState<string | null>(() => (id ? cache.get(id)?.url ?? null : null));
   useEffect(() => {
     if (!id) { setUrl(null); return; }
+    setUrl(cache.get(id)?.url ?? null); // never show the previous id's (soon revoked) URL
     let alive = true;
     let got = false;
     acquire(id).then((u) => {

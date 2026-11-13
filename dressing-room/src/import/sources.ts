@@ -1,5 +1,7 @@
 export type ImportErrorCode =
-  | 'notImage' | 'clipboardEmpty' | 'clipboardDenied' | 'badUrl' | 'pinterest' | 'cors' | 'urlNotImage';
+  | 'tooBig' | 'notImage' | 'clipboardEmpty' | 'clipboardDenied' | 'badUrl' | 'pinterest' | 'cors' | 'urlNotImage';
+
+const MAX_URL_BYTES = 15 * 1024 * 1024;
 
 export class ImportError extends Error {
   constructor(public code: ImportErrorCode) { super(code); }
@@ -58,15 +60,24 @@ export function classifyUrl(raw: string): URL {
 
 export async function fromUrl(raw: string): Promise<Picked> {
   const url = classifyUrl(raw);
-  let res: Response;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  let blob: Blob;
   try {
-    res = await fetch(url.href, { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
-  } catch {
-    // The browser hides the reason (CORS, offline, DNS); CORS is by far the usual one.
+    const res = await fetch(url.href, {
+      mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl.signal,
+    });
+    if (!res.ok) throw new ImportError('cors');
+    if (Number(res.headers.get('content-length') ?? 0) > MAX_URL_BYTES) throw new ImportError('tooBig');
+    blob = await res.blob();
+  } catch (e) {
+    if (e instanceof ImportError) throw e;
+    // The browser hides the reason (CORS, offline, DNS, timeout); CORS is by far the usual one.
     throw new ImportError('cors');
+  } finally {
+    clearTimeout(timer);
   }
-  if (!res.ok) throw new ImportError('cors');
-  const blob = await res.blob();
+  if (blob.size > MAX_URL_BYTES) throw new ImportError('tooBig');
   if (!blob.type.startsWith('image/')) throw new ImportError('urlNotImage');
   return { blob, origin: { type: 'url', url: url.href } };
 }

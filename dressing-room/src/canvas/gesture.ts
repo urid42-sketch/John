@@ -46,10 +46,11 @@ export function toLocalUnit(
 export interface AlphaMap { w: number; h: number; data: Uint8Array }
 
 /** True when the unit point lands on (or within `slop` of) a visible pixel of the alpha map. */
-export function hitsAlpha(map: AlphaMap | undefined, u: Pt, slop = 0.04): boolean {
-  if (u.x < -slop || u.x > 1 + slop || u.y < -slop || u.y > 1 + slop) return false;
-  if (!map) return u.x >= 0 && u.x <= 1 && u.y >= 0 && u.y <= 1;
-  for (const [ox, oy] of [[0, 0], [slop, 0], [-slop, 0], [0, slop], [0, -slop]]) {
+export function hitsAlpha(map: AlphaMap | undefined, u: Pt, slopX = 0.04, slopY = slopX): boolean {
+  if (u.x < -slopX || u.x > 1 + slopX || u.y < -slopY || u.y > 1 + slopY) return false;
+  if (!map) return true;
+  const sx = slopX, sy = slopY;
+  for (const [ox, oy] of [[0, 0], [sx, 0], [-sx, 0], [0, sy], [0, -sy], [sx / 2, sy / 2], [-sx / 2, sy / 2], [sx / 2, -sy / 2], [-sx / 2, -sy / 2]]) {
     const x = Math.round((u.x + ox) * (map.w - 1)), y = Math.round((u.y + oy) * (map.h - 1));
     if (x < 0 || y < 0 || x >= map.w || y >= map.h) continue;
     if (map.data[y * map.w + x] > 24) return true;

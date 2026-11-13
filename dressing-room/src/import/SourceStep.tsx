@@ -8,6 +8,7 @@ import { fromClipboard, fromDataTransfer, fromFile, fromUrl, ImportError, type P
 export function SourceStep({ kind, onPick }: { kind: 'garment' | 'doll'; onPick: (p: Picked) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const pasteRef = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
@@ -34,6 +35,16 @@ export function SourceStep({ kind, onPick }: { kind: 'garment' | 'doll'; onPick:
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
   }, [onPick]);
+
+  // The paste target is contenteditable only so iOS offers "Paste"; never let it be edited.
+  useEffect(() => {
+    const el = pasteRef.current;
+    if (!el) return;
+    const block = (e: Event) => e.preventDefault();
+    el.addEventListener('beforeinput', block);
+    el.addEventListener('cut', block);
+    return () => { el.removeEventListener('beforeinput', block); el.removeEventListener('cut', block); };
+  }, []);
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
@@ -91,8 +102,7 @@ export function SourceStep({ kind, onPick }: { kind: 'garment' | 'doll'; onPick:
       )}
 
       <div
-        contentEditable suppressContentEditableWarning inputMode="none" onPaste={onAreaPaste}
-        onBeforeInput={(e) => e.preventDefault()}
+        ref={pasteRef} contentEditable suppressContentEditableWarning inputMode="none" onPaste={onAreaPaste}
         className="flex min-h-20 items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-muted outline-none focus:border-rose"
         style={{ WebkitUserSelect: 'text', userSelect: 'text', WebkitTouchCallout: 'default', caretColor: 'transparent' }}
         aria-label={he.import.pasteAreaHint}

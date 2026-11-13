@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link, Outlet, Route, Routes } from 'react-router-dom';
+import { db } from './db/schema';
 import { he } from './i18n/he';
 import { ImportFlow } from './import/ImportFlow';
 import { DollsScreen } from './screens/DollsScreen';
@@ -29,6 +31,19 @@ function Shell() {
 }
 
 export function App() {
+  const [dbError, setDbError] = useState(false);
+  useEffect(() => {
+    db.open().catch((e) => { console.error(e); setDbError(true); });
+  }, []);
+  if (dbError) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
+        <h1 className="font-serif text-2xl">{he.appName}</h1>
+        <p className="max-w-xs leading-relaxed text-muted">{he.errors.dbFailed}</p>
+        <button className="btn btn-primary" onClick={() => location.reload()}>{he.common.retry}</button>
+      </div>
+    );
+  }
   return (
     <>
       <ToastHost />

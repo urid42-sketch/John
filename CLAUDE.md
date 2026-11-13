@@ -8,13 +8,25 @@ Mobile-first, Hebrew RTL, single user, no login, everything local in IndexedDB.
 project — do not read or modify them.
 
 ## Current stage
-**Stage 0 (planning) — done, waiting for user approval.** Next: Stage 1 (MVP).
-Stages: 0 plan · 1 MVP (doll, import, wardrobe, try-on) · 2 studio from scratch · 3 studio edit imported ·
+**Stage 1 (MVP) — done, reviewed, waiting for the user's phone test.** Next: Stage 2 (studio, create from scratch).
+Stages: 0 plan ✔ · 1 MVP ✔ · 2 studio from scratch · 3 studio edit imported ·
 4 looks/export/backup/PWA/Vercel · 5 AI (only if user approves).
 
+User: Aya (name is `USER_NAME` in `i18n/he.ts`), iPhone / Safari. All architect simplifications approved.
+
+Stage 1 state and deviations from ARCHITECTURE.md:
+- No Konva Transformer: custom pointer handling in `canvas/TryOnStage.tsx` (drag, pinch, rotate) + sliders;
+  hit testing is ours (alpha maps from thumbs, `canvas/gesture.ts`), Konva nodes are `listening={false}`.
+- Bg removal: `imaging/bgRemoval.ts` calls the library on the main thread (it proxies to its own worker),
+  runs serialized, asks consent before the first 80MB download, and skips auto-run after a crashed run.
+- Repos are one file (`db/repo.ts`). No Zustand yet (add with the studio store). `GarmentBody` is raster-only.
+- Not built yet: doll calibration (stage 2), looks/backup/PWA (stage 4). Studio and Looks tabs are placeholders.
+- NOT verified in the sandbox (model CDN blocked): a real @imgly model run. Needs a check on the phone,
+  together with a 48MP photo import and long-press paste.
+
 ## Stack
-React + Vite + TypeScript, Tailwind v4 · Konva/react-konva · Dexie (IndexedDB) · Zustand (editor state only) ·
-react-router · @imgly/background-removal in a Web Worker (lazy, AGPL, ~80MB model on first use) ·
+React 19 + Vite 8 + TypeScript 7, Tailwind v4 · Konva/react-konva · Dexie (IndexedDB) · Zustand (planned, stage 2) ·
+react-router-dom · @imgly/background-removal in a Web Worker (lazy, AGPL, ~80MB model on first use) ·
 fflate (ZIP backup) · vite-plugin-pwa · Vitest. Deploy: Vercel, Root Directory = `dressing-room`.
 
 ## Structure (dressing-room/src)
@@ -38,5 +50,6 @@ Full design: `dressing-room/docs/ARCHITECTURE.md` (read only the section you nee
 - Don't read node_modules, dist, lock files. Focused diffs, not full rewrites.
 - Branch: `claude/gallant-wright-bevvul`. No PR unless asked.
 
-## Commands (from dressing-room/, once scaffolded)
-`npm run dev -- --host` · `npm run build` · `npm run test` · `npm run lint`
+## Commands (from dressing-room/)
+`npm run dev` (already binds to the LAN) · `npm run build` · `npm run test` · `npm run lint`
+Browser check: build, `npx vite preview --port 4173`, then drive it with the pre-installed Playwright (iPhone 13 device).

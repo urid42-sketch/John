@@ -106,22 +106,29 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   const hitTest = (p: Pt): PlacedItem | null => {
-    const { items: its, L: lay } = live.current;
-    for (const it of [...its].sort((a, b) => b.z - a.z)) {
+    const { items: its, L: lay, selectedId: sel } = live.current;
+    const order = [...its].sort((a, b) => (a.id === sel ? -1 : b.id === sel ? 1 : b.z - a.z));
+    for (const it of order) {
       const g = garments.get(it.garmentId);
       if (!g) continue;
       const { cx, cy, w, h } = geom(it, g, lay);
-      if (hitsAlpha(alpha.get(g.id), toLocalUnit(p, { x: cx, y: cy }, w, h, it.rotation, it.flipX))) return it;
+      // Finger-sized tolerance (thin items like a necklace are only a few px tall),
+      // and a more generous one for the item that is already selected.
+      const px = it.id === sel ? 26 : 14;
+      const u = toLocalUnit(p, { x: cx, y: cy }, w, h, it.rotation, it.flipX);
+      if (hitsAlpha(alpha.get(g.id), u, Math.max(0.04, px / w), Math.max(0.04, px / h))) return it;
     }
     return null;
   };
   const patch = (id: ID, next: Partial<PlacedItem>, commit: boolean) => {
-    onChange(live.current.items.map((i) => (i.id === id ? { ...i, ...next } : i)), commit);
+    const items2 = live.current.items.map((i) => (i.id === id ? { ...i, ...next } : i));
+    live.current.items = items2; // so a commit right after never uses a stale frame
+    onChange(items2, commit);
   };
 
   type Gesture =
     | { kind: 'drag'; id: ID | null; p0: Pt; start: PlacedItem | null; moved: boolean }
-    | { kind: 'pinch'; id: ID; a0: Pt; b0: Pt; start: PlacedItem };
+    | { kind: 'pinch'; id: ID; ids: [number, number]; a0: Pt; b0: Pt; start: PlacedItem };
   const pts = useRef(new Map<number, Pt>());
   const gesture = useRef<Gesture | null>(null);
   const dirty = useRef(false);
@@ -132,6 +139,8 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
   };
 
   const onDown = (e: RPointerEvent) => {
+    // A new primary pointer means no other finger is down: drop anything a missed "up" left behind.
+    if (e.isPrimary) { pts.current.clear(); gesture.current = null; }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const p = pos(e);
     pts.current.set(e.pointerId, p);
@@ -145,8 +154,8 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
       const start = id ? live.current.items.find((i) => i.id === id) : undefined;
       if (!id || !start) return;
       onSelect(id);
-      const [a0, b0] = [...pts.current.values()];
-      gesture.current = { kind: 'pinch', id, a0, b0, start };
+      const ids = [...pts.current.keys()] as [number, number];
+      gesture.current = { kind: 'pinch', id, ids, a0: pts.current.get(ids[0])!, b0: pts.current.get(ids[1])!, start };
     }
   };
 
@@ -164,8 +173,9 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
       if (!g.id || !g.start) return;
       dirty.current = true;
       patch(g.id, { x: g.start.x + dx / lay.dw, y: g.start.y + dy / lay.dh }, false);
-    } else if (pts.current.size >= 2) {
-      const [a1, b1] = [...pts.current.values()];
+    } else {
+      const a1 = pts.current.get(g.ids[0]), b1 = pts.current.get(g.ids[1]);
+      if (!a1 || !b1) return;
       const s = g.start;
       const next = pinchTransform(
         { x: lay.ox + s.x * lay.dw, y: lay.oy + s.y * lay.dh, scale: s.scale, rotation: s.rotation },
@@ -182,11 +192,15 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
   const onUp = (e: RPointerEvent) => {
     if (!pts.current.delete(e.pointerId)) return;
     const g = gesture.current;
-    if (pts.current.size === 1 && g?.kind === 'pinch') {
-      // One finger lifted: keep dragging with the remaining one, from where the item is now.
-      beginDrag(g.id, [...pts.current.values()][0]);
-      if (gesture.current?.kind === 'drag') gesture.current.moved = true;
-    } else if (pts.current.size === 0) {
+    if (pts.current.size > 0 && g?.kind === 'pinch' && g.ids.includes(e.pointerId)) {
+      // One pinch finger lifted: keep dragging with the other one, from where the item is now.
+      const rest = g.ids.find((i) => i !== e.pointerId)!;
+      const p = pts.current.get(rest);
+      for (const k of [...pts.current.keys()]) if (k !== rest) pts.current.delete(k);
+      if (p) { beginDrag(g.id, p); if (gesture.current?.kind === 'drag') gesture.current.moved = true; }
+      else { pts.current.clear(); gesture.current = null; }
+    }
+    if (pts.current.size === 0) {
       if (g?.kind === 'drag' && !g.id && !g.moved) onSelect(null);
       gesture.current = null;
       if (dirty.current) { dirty.current = false; onChange(live.current.items, true); }
@@ -214,7 +228,8 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
   return (
     <div
       ref={area} dir="ltr" className="absolute inset-0 select-none" style={{ touchAction: 'none' }}
-      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onWheel={onWheel}
+      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+      onLostPointerCapture={onUp} onWheel={onWheel}
     >
       {fit.cw > 0 && fit.ch > 0 && (
         <Stage ref={stageRef} width={fit.cw} height={fit.ch} listening={false}>

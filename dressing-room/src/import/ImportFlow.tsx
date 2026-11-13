@@ -60,6 +60,7 @@ export function ImportFlow() {
   const onCropped = (c: HTMLCanvasElement) => {
     if (cropped.current && cropped.current !== source.current) releaseCanvas(cropped.current);
     cropped.current = c;
+    releaseCanvas(initialMask.current);
     initialMask.current = hasTransparency(c) ? maskFromOwnAlpha(c) : null;
     setStep('cutout');
   };
@@ -88,6 +89,7 @@ export function ImportFlow() {
   };
 
   const back = () => {
+    if (saving) return;
     if (step === 'source') nav(-1);
     else if (step === 'crop') setStep('source');
     else if (step === 'cutout') setStep('crop');
@@ -103,7 +105,7 @@ export function ImportFlow() {
   return (
     <div className="flex h-full flex-col bg-cream">
       <header className="safe-t flex items-center gap-2 px-2 py-2">
-        <button className="flex h-12 w-12 items-center justify-center" onClick={back} aria-label={he.common.back}>
+        <button className="flex h-12 w-12 items-center justify-center disabled:opacity-40" onClick={back} disabled={saving} aria-label={he.common.back}>
           {step === 'source' ? <IconClose /> : <IconBack />}
         </button>
         <h1 className="flex-1 font-serif text-xl">{title}</h1>

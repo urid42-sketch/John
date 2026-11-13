@@ -6,9 +6,46 @@ export interface BgProgress { phase: 'download' | 'compute'; ratio: number }
  * Automatic background removal, fully in the browser. The library (and its ~80MB model) is
  * loaded lazily on first use only. Returns a mask canvas the size of `src`.
  */
-export async function autoMask(
+const READY_KEY = 'bg-model-ready', RUNNING_KEY = 'bg-run-in-progress';
+const ls = {
+  get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k: string, v: string | null) => {
+    try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* private mode */ }
+  },
+};
+/** The model was downloaded and ran successfully at least once on this device. */
+export const isModelReady = () => ls.get(READY_KEY) === '1';
+/** True once if the previous run never finished (the tab most likely ran out of memory). */
+export function consumeCrashFlag(): boolean {
+  const crashed = ls.get(RUNNING_KEY) !== null;
+  if (crashed) ls.set(RUNNING_KEY, null);
+  return crashed;
+}
+
+let inflight: Promise<unknown> = Promise.resolve();
+
+/** Runs are serialized: two models in memory at once would kill a phone tab. */
+export function autoMask(
   src: HTMLCanvasElement, onProgress?: (p: BgProgress) => void,
 ): Promise<HTMLCanvasElement> {
+  const run = inflight.catch(() => undefined).then(async () => {
+    ls.set(RUNNING_KEY, String(Date.now()));
+    try {
+      const mask = await runModel(src, onProgress);
+      ls.set(READY_KEY, '1');
+      return mask;
+    } finally {
+      ls.set(RUNNING_KEY, null);
+    }
+  });
+  inflight = run;
+  return run;
+}
+
+async function runModel(
+  src: HTMLCanvasElement, onProgress?: (p: BgProgress) => void,
+): Promise<HTMLCanvasElement> {
+  if (!src.width) throw new Error('source released');
   const input = await canvasToBlob(src, 'image/png');
   const { removeBackground } = await import('@imgly/background-removal');
   const totals = new Map<string, [number, number]>();

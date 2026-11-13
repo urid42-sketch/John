@@ -124,8 +124,14 @@ export function TryOnScreen() {
     timer.current = setTimeout(flush, 400);
   }, [flush]);
   useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
     window.addEventListener('pagehide', flush);
-    return () => { window.removeEventListener('pagehide', flush); flush(); };
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHide);
+      flush();
+    };
   }, [flush]);
 
   const activeDollId = doll?.id ?? null;
@@ -219,9 +225,7 @@ export function TryOnScreen() {
                 <span className="w-10 shrink-0">{he.tryon[key]}</span>
                 <input
                   type="range" dir={key === 'rotate' ? 'ltr' : undefined} min={min} max={max} value={val} className="h-10 flex-1"
-                  onChange={(e) => patchSel(toPatch(Number(e.target.value)), false)}
-                  onPointerUp={() => persist(items, activeDollId)}
-                  onKeyUp={() => persist(items, activeDollId)}
+                  onChange={(e) => patchSel(toPatch(Number(e.target.value)))}
                 />
               </label>
             ))}
