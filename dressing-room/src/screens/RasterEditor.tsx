@@ -7,7 +7,9 @@ import { db } from '../db/schema';
 import { fromTemplate, normalizeDesign } from '../engine/templates';
 import type { GarmentDesign } from '../engine/types';
 import { he } from '../i18n/he';
-import { canvasToBlob, composite, ctx2d, decodeToCanvas, releaseCanvas, scaledCopy } from '../imaging/load';
+import { AiGate, aiReady } from '../ai/AiGate';
+import { AiError, aiRequest, toJpegDataUrl } from '../ai/client';
+import { canvasToBlob, composite, ctx2d, decodeToCanvas, plainBackgroundMask, releaseCanvas, scaledCopy } from '../imaging/load';
 import { copyCanvas, fxDetails, fxFabric, fxLength, fxRecolor, fxWarp, trimCanvas } from '../imaging/rasterOps';
 import { hexToRgb } from '../imaging/recolor';
 import { Chips, Field, Slider, Swatches } from '../studio/controls';
@@ -59,6 +61,8 @@ export function RasterEditor() {
   const [keep, setKeep] = useState(100);
   const [pseudo, setPseudo] = useState<GarmentDesign>(() => ({ ...fromTemplate('aline'), fabric: { kind: 'floral', colors: ['#27408b', '#ffffff', '#e3c14a'], scale: 1, sheen: 0, sequins: 0 } }));
   const [selDetail, setSelDetail] = useState<string | null>(null);
+  const [aiText, setAiText] = useState('');
+  const [gate, setGate] = useState(false);
 
   /** The current tool's effect on any canvas; null when the tool has nothing to preview. */
   const effect = useCallback((src: HTMLCanvasElement, forPreview: boolean): HTMLCanvasElement | null => {
@@ -192,6 +196,27 @@ export function RasterEditor() {
       nav(-1);
     } catch (e) { console.error(e); toastError(errorText(e, he.errors.saveFailed)); setBusy(false); }
   };
+  /** Text edit: the garment goes to the AI service, comes back on white, and is cut out again. */
+  const aiEdit = async () => {
+    if (!work.current || !aiText.trim()) return;
+    if (!aiReady()) { setGate(true); return; }
+    setBusy(true);
+    try {
+      const png = await canvasToBlob(work.current, 'image/png');
+      const result = await aiRequest({ mode: 'edit', images: [await toJpegDataUrl(png)], text: aiText.trim() });
+      const img = await decodeToCanvas(result, 1536);
+      const mask = plainBackgroundMask(img, 34);
+      const cut = composite(img, mask);
+      releaseCanvas(img); releaseCanvas(mask);
+      commit(trimCanvas(cut));
+      toast(t.applied);
+    } catch (e) {
+      console.error(e);
+      if (e instanceof AiError) { toastError(he.ai[e.code]); if (e.code === 'badPin') setGate(true); }
+      else toastError(errorText(e, he.ai.failed));
+    } finally { setBusy(false); }
+  };
+
   const leave = () => { if (stack.edits <= 0 || stack.undo === 0 || confirm(t.leaveConfirm)) nav(-1); };
 
   // ---- pointer: erase brush / region brush ----
@@ -255,7 +280,7 @@ export function RasterEditor() {
   };
 
   if (garment === null) return <div className="p-8 text-center text-muted">{he.garment.notFound}</div>;
-  const canApply = tool !== 'erase' && ready && !busy;
+  const canApply = tool !== 'erase' && tool !== 'ai' && ready && !busy;
   const setPseudoN = (d: GarmentDesign) => setPseudo(normalizeDesign(d));
 
   return (
@@ -349,12 +374,25 @@ export function RasterEditor() {
         )}
         {tool === 'details' && <DetailsPanel d={pseudo} set={setPseudoN} selected={selDetail} onSelect={setSelDetail} noDrag />}
 
-        {tool !== 'erase' && <button className="btn btn-primary w-full" disabled={!canApply} onClick={apply}>{busy ? t.working : t.apply}</button>}
+        {tool === 'ai' && (
+          <>
+            <p className="text-xs text-muted">{he.ai.editHint}</p>
+            <textarea
+              value={aiText} maxLength={300} rows={3} placeholder={he.ai.editPlaceholder} onChange={(e) => setAiText(e.target.value)}
+              className="w-full rounded-2xl border border-line bg-paper p-3 outline-none focus:border-rose"
+            />
+            <button className="btn btn-primary w-full" disabled={!ready || busy || !aiText.trim()} onClick={() => void aiEdit()}>
+              {busy ? t.working : he.ai.editGo}
+            </button>
+          </>
+        )}
+        {tool !== 'erase' && tool !== 'ai' && <button className="btn btn-primary w-full" disabled={!canApply} onClick={apply}>{busy ? t.working : t.apply}</button>}
         <div className="flex gap-2">
           <button className="btn btn-ghost flex-1 text-sm" disabled={!ready || busy} onClick={() => void save(true)}>{he.studio.saveCopy}</button>
           <button className="btn btn-ghost flex-1 text-sm" disabled={!ready || busy} onClick={() => void toOriginal()}>{t.original}</button>
         </div>
       </div>
+      {gate && <AiGate onClose={() => setGate(false)} onReady={() => { setGate(false); void aiEdit(); }} />}
     </div>
   );
 }

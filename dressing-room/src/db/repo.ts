@@ -222,3 +222,38 @@ export async function saveRasterEdit(g: Garment, r: EditedRender, asCopy: boolea
   });
   return out;
 }
+
+// ---- looks ----
+export interface LookRender { png: Blob; w: number; h: number; thumb: Blob; thumbW: number; thumbH: number }
+
+/** Save a look. `items` may be empty for AI results, which are a picture only. */
+export async function addLook(name: string, dollId: ID | null, items: PlacedItem[], r: LookRender, ai = false): Promise<Look> {
+  const id = crypto.randomUUID();
+  const [render, thumb] = await Promise.all([
+    makeStoredBlob(id, 'render', r.png, r.w, r.h),
+    makeStoredBlob(id, 'thumb', r.thumb, r.thumbW, r.thumbH),
+  ]);
+  const now = Date.now();
+  const look: Look = { id, name, dollId, items, favorite: false, render: render.id, thumb: thumb.id, createdAt: now, updatedAt: now, ai };
+  await db.transaction('rw', db.looks, db.blobs, async () => {
+    await db.blobs.bulkAdd([render, thumb]);
+    await db.looks.add(look);
+  });
+  return look;
+}
+
+export async function deleteLook(id: ID): Promise<void> {
+  await db.transaction('rw', db.looks, db.blobs, async () => {
+    await db.looks.delete(id);
+    await db.blobs.where('ownerId').equals(id).delete();
+  });
+}
+
+export async function toggleLookFavorite(id: ID, favorite: boolean): Promise<void> {
+  await db.looks.update(id, { favorite, updatedAt: Date.now() });
+}
+
+/** Put a saved look back on the doll (replaces the current try-on session). */
+export async function openLookInTryOn(look: Look): Promise<void> {
+  await saveDraft(look.dollId, look.items.map((i) => ({ ...i, id: crypto.randomUUID() })));
+}

@@ -1,14 +1,19 @@
+import type Konva from 'konva';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { AiGate, aiReady } from '../ai/AiGate';
+import { AiError, aiRequest, toJpegDataUrl, toLookRender } from '../ai/client';
+import { renderLook } from '../canvas/exportLook';
+import { getBlob } from '../db/blobs';
 import { normalizeDeg } from '../canvas/gesture';
 import { TryOnStage } from '../canvas/TryOnStage';
-import { getDraft, newPlacedItem, saveDraft } from '../db/repo';
+import { addLook, getDraft, newPlacedItem, saveDraft } from '../db/repo';
 import { db } from '../db/schema';
-import { CATEGORIES, type Category, type Garment, type ID, type PlacedItem } from '../db/types';
+import { CATEGORIES, DRAFT_LOOK_ID, type Category, type Garment, type ID, type PlacedItem } from '../db/types';
 import { he } from '../i18n/he';
 import { errorText } from '../ui/errors';
-import { IconClose, IconCopy, IconDown, IconFilter, IconFlip, IconHanger, IconTrash, IconUp } from '../ui/icons';
+import { IconClose, IconCopy, IconDown, IconFilter, IconFlip, IconHanger, IconHeart, IconSparkle, IconTrash, IconUp } from '../ui/icons';
 import { Thumb } from '../ui/Thumb';
 import { toast, toastError } from '../ui/toast';
 
@@ -96,6 +101,10 @@ export function TryOnScreen() {
   const [selectedId, setSelectedId] = useState<ID | null>(null);
   const [drawer, setDrawer] = useState(false);
   const [tune, setTune] = useState(false);
+  const [gate, setGate] = useState(false);
+  const [working, setWorking] = useState<string | null>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const nav = useNavigate();
 
   useEffect(() => {
     getDraft()
@@ -181,12 +190,44 @@ export function TryOnScreen() {
   };
   const switchDoll = (id: ID) => { setDollId(id); persist(items, id); };
 
+  const saveLook = async () => {
+    if (!stageRef.current || items.length === 0) { toast(he.looks.needItems); return; }
+    setWorking(he.import.saving);
+    try {
+      const n = (await db.looks.toCollection().primaryKeys()).filter((k) => k !== DRAFT_LOOK_ID).length + 1;
+      await addLook(he.looks.defaultName(n), doll.id, items, await renderLook(stageRef.current));
+      toast(he.looks.saved);
+    } catch (e) { console.error(e); toastError(errorText(e, he.errors.saveFailed)); }
+    finally { setWorking(null); }
+  };
+
+  const realistic = async () => {
+    if (!stageRef.current || items.length === 0) { toast(he.looks.needItems); return; }
+    if (!aiReady()) { setGate(true); return; }
+    setWorking(he.ai.working);
+    try {
+      const collage = await renderLook(stageRef.current, false);
+      const person = await getBlob(doll.cutout);
+      if (!person) throw new AiError('failed');
+      const images = await Promise.all([toJpegDataUrl(collage.png), toJpegDataUrl(person)]);
+      const result = await aiRequest({ mode: 'tryon', images });
+      const n = (await db.looks.toCollection().primaryKeys()).filter((k) => k !== DRAFT_LOOK_ID).length + 1;
+      await addLook(he.looks.defaultName(n), doll.id, [], await toLookRender(result), true);
+      toast(he.ai.done);
+      nav('/looks');
+    } catch (e) {
+      console.error(e);
+      if (e instanceof AiError) { toastError(he.ai[e.code]); if (e.code === 'badPin') setGate(true); }
+      else toastError(errorText(e, he.ai.failed));
+    } finally { setWorking(null); }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="closet-bg relative min-h-0 flex-1 overflow-hidden">
         <TryOnStage
           doll={doll} items={items} garments={garments}
-          selectedId={selectedId} onSelect={setSelectedId} onChange={update}
+          selectedId={selectedId} onSelect={setSelectedId} onChange={update} stageRef={stageRef}
         />
         {dolls.length > 1 && (
           <div className="absolute start-3 top-2 flex flex-col gap-2" role="group" aria-label={he.dolls.choose}>
@@ -242,13 +283,28 @@ export function TryOnScreen() {
               <ToolButton label={he.tryon.remove} onClick={remove}><IconTrash /></ToolButton>
             </>
           ) : (
-            <button className="btn btn-primary flex-1" onClick={() => setDrawer(true)}>
-              <IconHanger />{he.tryon.openWardrobe}
-            </button>
+            <div className="flex w-full gap-2">
+              <button className="btn btn-primary flex-1 !px-3" onClick={() => setDrawer(true)}>
+                <IconHanger />{he.tryon.openWardrobe}
+              </button>
+              <button className="btn btn-ghost !px-3 text-sm" onClick={() => void saveLook()} disabled={!!working}>
+                <IconHeart />{he.looks.save}
+              </button>
+              <button className="btn btn-ghost !px-3 text-sm" onClick={() => void realistic()} disabled={!!working} aria-label={he.ai.button}>
+                <IconSparkle />
+              </button>
+            </div>
           )}
         </div>
       </div>
 
+      {working && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-cream/85 p-8 text-center" role="status">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-rose-soft border-t-rose" />
+          <p className="max-w-xs">{working}</p>
+        </div>
+      )}
+      {gate && <AiGate onClose={() => setGate(false)} onReady={() => { setGate(false); void realistic(); }} />}
       {drawer && <WardrobeDrawer garments={garmentList ?? []} onPick={add} onClose={() => setDrawer(false)} />}
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, Route, Routes } from 'react-router-dom';
+import { lastBackupAt } from './db/backup';
 import { db } from './db/schema';
 import { he } from './i18n/he';
 import { ImportFlow } from './import/ImportFlow';
@@ -10,12 +11,12 @@ import { StudioHome } from './studio/StudioHome';
 import { GarmentScreen } from './screens/GarmentScreen';
 import { RasterEditor } from './screens/RasterEditor';
 import { SettingsScreen } from './screens/SettingsScreen';
-import { SoonScreen } from './screens/SoonScreen';
+import { LooksScreen } from './screens/LooksScreen';
 import { TryOnScreen } from './screens/TryOnScreen';
 import { WardrobeScreen } from './screens/WardrobeScreen';
 import { BottomNav } from './ui/BottomNav';
 import { IconGear } from './ui/icons';
-import { ToastHost } from './ui/toast';
+import { toast, ToastHost } from './ui/toast';
 
 function Shell() {
   return (
@@ -37,7 +38,13 @@ function Shell() {
 export function App() {
   const [dbError, setDbError] = useState(false);
   useEffect(() => {
-    db.open().catch((e) => { console.error(e); setDbError(true); });
+    db.open()
+      .then(async () => {
+        // Gentle nudge: plenty of content and no backup for two weeks.
+        const [last, count] = await Promise.all([lastBackupAt(), db.garments.count()]);
+        if (count >= 5 && (!last || Date.now() - last > 14 * 86400_000)) toast(he.backup.reminder);
+      })
+      .catch((e) => { console.error(e); setDbError(true); });
   }, []);
   if (dbError) {
     return (
@@ -56,7 +63,7 @@ export function App() {
           <Route index element={<TryOnScreen />} />
           <Route path="wardrobe" element={<WardrobeScreen />} />
           <Route path="studio" element={<StudioHome />} />
-          <Route path="looks" element={<SoonScreen title={he.soon.looks} body={he.soon.looksBody} />} />
+          <Route path="looks" element={<LooksScreen />} />
         </Route>
         <Route path="import/:kind" element={<div className="mx-auto h-full max-w-xl"><ImportFlow /></div>} />
         <Route path="garment/:id" element={<GarmentScreen />} />

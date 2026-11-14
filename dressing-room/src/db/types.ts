@@ -53,6 +53,8 @@ export interface PlacedItem {
 export interface Look {
   id: ID; name: string; dollId: ID | null; items: PlacedItem[]; favorite: boolean;
   render?: BlobRef; thumb?: BlobRef; createdAt: number; updatedAt: number;
+  /** made by the realistic (AI) try-on: a picture only, it cannot be re-opened on the doll */
+  ai?: boolean;
 }
 export const DRAFT_LOOK_ID = 'draft';
 
