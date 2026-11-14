@@ -27,6 +27,13 @@ function limited(ip) {
   hits.set(ip, list);
   return list.length > 8;
 }
+/** Result images are served from fal's storage; refuse anything else (the response is data, not trust). */
+function isFalMediaUrl(u) {
+  try {
+    const { protocol, hostname } = new URL(u);
+    return protocol === 'https:' && (hostname.endsWith('.fal.media') || hostname === 'fal.media' || hostname.endsWith('.fal.ai') || hostname === 'storage.googleapis.com');
+  } catch { return false; }
+}
 function samePin(a, b) {
   const x = Buffer.from(String(a ?? '')), y = Buffer.from(String(b));
   return x.length === y.length && timingSafeEqual(x, y);
@@ -65,7 +72,7 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: 'provider', status: r.status });
     }
     const url = (await r.json())?.images?.[0]?.url;
-    if (typeof url !== 'string' || !url.startsWith('https://')) return res.status(502).json({ error: 'no_image' });
+    if (!isFalMediaUrl(url)) return res.status(502).json({ error: 'no_image' }); // only ever fetch from fal's own storage
     const img = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!img.ok) return res.status(502).json({ error: 'no_image' });
     const type = img.headers.get('content-type') ?? 'image/jpeg';
