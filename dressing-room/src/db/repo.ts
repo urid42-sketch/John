@@ -180,6 +180,12 @@ export async function saveDesign(name: string, design: GarmentDesign, r: DesignR
       await db.garmentVersions.delete(old.id);
       await db.blobs.delete(old.thumb);
     }
+    return prev;
+  }).then(async (prev) => {
+    if (prev?.body.kind === 'design') {
+      const f0 = prev.body.bodyFrame;
+      await refitPlacedItems(gid, r.frame.h / f0.h, (r.frame.y - f0.y) / f0.h);
+    }
   });
   return out;
 }
@@ -256,4 +262,22 @@ export async function toggleLookFavorite(id: ID, favorite: boolean): Promise<voi
 /** Put a saved look back on the doll (replaces the current try-on session). */
 export async function openLookInTryOn(look: Look): Promise<void> {
   await saveDraft(look.dollId, look.items.map((i) => ({ ...i, id: crypto.randomUUID() })));
+}
+
+/**
+ * A garment's image changed size (studio re-save, raster edit). Items already placed on the doll
+ * store their height as a fraction of the doll, so scale them by the same ratio and keep the top
+ * of the garment where it was (`topShift` = how far the top moved, in old-height units).
+ */
+async function refitPlacedItems(garmentId: ID, ratio: number, topShift = 0): Promise<void> {
+  if (!Number.isFinite(ratio) || ratio <= 0 || (Math.abs(ratio - 1) < 0.01 && Math.abs(topShift) < 0.005)) return;
+  await db.looks.toCollection().modify((look) => {
+    if (look.ai) return;
+    for (const it of look.items) {
+      if (it.garmentId !== garmentId) continue;
+      const old = it.scale;
+      it.scale = old * ratio;
+      it.y = it.y - old / 2 + topShift * old + it.scale / 2;
+    }
+  });
 }

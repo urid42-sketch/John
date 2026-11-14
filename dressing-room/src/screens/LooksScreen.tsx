@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { shareImage } from '../canvas/exportLook';
 import { getBlob } from '../db/blobs';
-import { deleteLook, openLookInTryOn, toggleLookFavorite } from '../db/repo';
+import { toLookRender } from '../ai/client';
+import { addLook, deleteLook, openLookInTryOn, toggleLookFavorite } from '../db/repo';
 import { db } from '../db/schema';
 import { DRAFT_LOOK_ID, type ID, type Look } from '../db/types';
 import { he } from '../i18n/he';
@@ -29,6 +30,14 @@ export function LooksScreen() {
   const open = looks?.find((l) => l.id === openId) ?? null;
   const pair = picked.map((id) => looks?.find((l) => l.id === id)).filter((l): l is Look => !!l);
   const guard = (fn: () => Promise<void>) => () => { fn().catch((e) => toastError(errorText(e))); };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const addImage = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      await addLook(he.looks.defaultName((looks?.length ?? 0) + 1), null, [], await toLookRender(f), true);
+      toast(he.ai.imageAdded);
+    } catch (e) { toastError(errorText(e, he.errors.decode)); }
+  };
 
   const tap = (l: Look) => {
     if (!comparing) { setOpenId(l.id); return; }
@@ -46,6 +55,8 @@ export function LooksScreen() {
         <button className="chip" aria-pressed={!onlyFav} onClick={() => setOnlyFav(false)}>{t.all}</button>
         <button className="chip" aria-pressed={onlyFav} onClick={() => setOnlyFav(true)}>{t.favorites}</button>
         <span className="flex-1" />
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void addImage(f); }} />
+        <button className="chip" onClick={() => fileRef.current?.click()}>{he.ai.addImage}</button>
         {(looks?.length ?? 0) >= 2 && (
           <button className="chip" aria-pressed={comparing} onClick={() => { setComparing((v) => !v); setPicked([]); }}>
             {comparing ? t.compareDone : t.compare}

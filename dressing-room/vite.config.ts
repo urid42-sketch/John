@@ -10,7 +10,7 @@ function serviceWorker(): Plugin {
     apply: 'build',
     generateBundle(_options, bundle) {
       const assets = Object.values(bundle)
-        .filter((f) => !f.fileName.endsWith('.wasm') && !f.fileName.endsWith('.map') && !/ort[.-]/.test(f.fileName))
+        .filter((f) => !f.fileName.endsWith('.wasm') && !f.fileName.endsWith('.map') && !/(^|\/)ort[.-]/.test(f.fileName) && !(f.type === 'chunk' && f.code.length > 600_000 && !f.isEntry))
         .map((f) => `/${f.fileName}`);
       const list = ['/', '/index.html', '/manifest.webmanifest', '/closet.svg', '/icons/icon-192.png', ...assets];
       const source = readFileSync(new URL('./src/sw.template.js', import.meta.url), 'utf8')

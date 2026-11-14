@@ -22,7 +22,7 @@ import { useFit } from '../ui/useFit';
 
 const t = he.edit;
 type Tool = keyof typeof t.tools;
-const MAX_UNDO = 6, PREVIEW = 720;
+const MAX_UNDO = 5, PREVIEW = 720, MAX_SIDE = 1536;
 
 export function RasterEditor() {
   const { id = '' } = useParams();
@@ -52,6 +52,7 @@ export function RasterEditor() {
   const [strength, setStrength] = useState(100);
   const [region, setRegion] = useState(false);
   const [hasSel, setHasSel] = useState(false);
+  const [selRev, setSelRev] = useState(0); // bumps after every region stroke so the preview re-runs
   const [brush, setBrush] = useState(40);
   const [band, setBand] = useState({ y0: 0.55, y1: 0.8 });
   const [lengthK, setLengthK] = useState(100);
@@ -75,9 +76,9 @@ export function RasterEditor() {
     if (tool === 'shape') return waist === 0 && hem === 0 ? null : fxWarp(src, waist / 100 * 0.3, waistY / 100, hem / 100 * 0.4);
     if (tool === 'fabric') return fxFabric(src, pseudo.fabric, keep / 100);
     if (tool === 'details') return pseudo.details.length ? fxDetails(src, pseudo) : null;
-    void forPreview;
+    void forPreview; void selRev;
     return null;
-  }, [tool, mode, color, hue, sat, strength, region, hasSel, lengthK, band, waist, waistY, hem, keep, pseudo]);
+  }, [tool, mode, color, hue, sat, strength, region, hasSel, selRev, lengthK, band, waist, waistY, hem, keep, pseudo]);
 
   const show = useCallback((c: HTMLCanvasElement) => {
     const v = view.current;
@@ -116,6 +117,11 @@ export function RasterEditor() {
       undo.current.push(work.current);
       if (undo.current.length > MAX_UNDO) releaseCanvas(undo.current.shift());
       if (!opts.keepRedo) { redo.current.forEach(releaseCanvas); redo.current = []; }
+    }
+    if (Math.max(next.width, next.height) > MAX_SIDE) { // repeated lengthen / widen must not grow without limit
+      const fitted = scaledCopy(next, MAX_SIDE);
+      releaseCanvas(next);
+      next = fitted;
     }
     work.current = next;
     releaseCanvas(small.current);
@@ -196,6 +202,9 @@ export function RasterEditor() {
       nav(-1);
     } catch (e) { console.error(e); toastError(errorText(e, he.errors.saveFailed)); setBusy(false); }
   };
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+
   /** Text edit: the garment goes to the AI service, comes back on white, and is cut out again. */
   const aiEdit = async () => {
     if (!work.current || !aiText.trim()) return;
@@ -204,6 +213,7 @@ export function RasterEditor() {
     try {
       const png = await canvasToBlob(work.current, 'image/png');
       const result = await aiRequest({ mode: 'edit', images: [await toJpegDataUrl(png)], text: aiText.trim() });
+      if (!alive.current) return;
       const img = await decodeToCanvas(result, 1536);
       const mask = plainBackgroundMask(img, 34);
       const cut = composite(img, mask);
@@ -214,10 +224,10 @@ export function RasterEditor() {
       console.error(e);
       if (e instanceof AiError) { toastError(he.ai[e.code]); if (e.code === 'badPin') setGate(true); }
       else toastError(errorText(e, he.ai.failed));
-    } finally { setBusy(false); }
+    } finally { if (alive.current) setBusy(false); }
   };
 
-  const leave = () => { if (stack.edits <= 0 || stack.undo === 0 || confirm(t.leaveConfirm)) nav(-1); };
+  const leave = () => { if (stack.edits <= 0 || confirm(t.leaveConfirm)) nav(-1); };
 
   // ---- pointer: erase brush / region brush ----
   const stroke = useRef<{ id: number; x: number; y: number } | null>(null);
@@ -267,7 +277,7 @@ export function RasterEditor() {
       releaseCanvas(small.current);
       small.current = scaledCopy(work.current, PREVIEW);
       setStack((s) => ({ undo: undo.current.length, redo: 0, edits: s.edits + 1 }));
-    } else setHasSel(true);
+    } else { setHasSel(true); setSelRev((n) => n + 1); }
   };
 
   // ---- length guides ----

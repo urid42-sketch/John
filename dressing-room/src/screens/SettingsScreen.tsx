@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { setAiPin } from '../ai/client';
 import { shareImage } from '../canvas/exportLook';
-import { BackupError, exportBackup, importBackup, lastBackupAt } from '../db/backup';
+import { BackupError, exportBackup, importBackup, lastBackupAt, markBackupDone, type BackupCounts } from '../db/backup';
 import { formatBytes, requestPersist, storageInfo } from '../db/storage';
 import { he } from '../i18n/he';
 import { errorText } from '../ui/errors';
@@ -17,6 +17,7 @@ export function SettingsScreen() {
   const [last, setLast] = useState<number | null | undefined>(undefined);
   const [busy, setBusy] = useState<{ label: string; ratio: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<{ blob: Blob; name: string; counts: BackupCounts } | null>(null);
   const refresh = () => {
     void requestPersist().then(storageInfo).then(setInfo);
     void lastBackupAt().then(setLast).catch(() => setLast(null));
@@ -26,12 +27,20 @@ export function SettingsScreen() {
   const backup = async () => {
     setBusy({ label: t.working, ratio: 0 });
     try {
-      const { blob, name, counts } = await exportBackup((ratio) => setBusy({ label: t.working, ratio }));
-      await shareImage(new File([blob], name, { type: 'application/zip' }), name.replace(/\.zip$/, ''));
-      toast(t.done(counts));
-      refresh();
+      setFile(await exportBackup((ratio) => setBusy({ label: t.working, ratio })));
     } catch (e) { console.error(e); toastError(errorText(e)); }
     finally { setBusy(null); }
+  };
+  // Separate tap: iOS only opens the share sheet straight from a user gesture.
+  const saveFile = async () => {
+    if (!file) return;
+    try {
+      await shareImage(file.blob, file.name.replace(/\.zip$/, ''));
+      await markBackupDone();
+      toast(t.done(file.counts));
+      setFile(null);
+      refresh();
+    } catch (e) { console.error(e); toastError(errorText(e)); }
   };
   const restore = async (file: File | undefined) => {
     if (!file || !confirm(t.confirm)) return;
@@ -68,6 +77,11 @@ export function SettingsScreen() {
               <div className="h-1.5 overflow-hidden rounded-full bg-rose-soft" dir="ltr">
                 <div className="h-full bg-rose" style={{ width: `${Math.round(busy.ratio * 100)}%` }} />
               </div>
+            </div>
+          ) : file ? (
+            <div className="space-y-2">
+              <p className="text-sm">{t.ready}</p>
+              <button className="btn btn-primary w-full" onClick={() => void saveFile()}>{t.saveFile}</button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">

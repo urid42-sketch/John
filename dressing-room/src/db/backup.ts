@@ -1,10 +1,11 @@
-import { Unzip, UnzipInflate, Zip, ZipPassThrough, strFromU8, strToU8 } from 'fflate';
 import { db, SCHEMA_VERSION } from './schema';
 import type { StoredBlob } from './types';
+import { readZip, ZipWriter } from './zip';
 
 const APP = 'dressing-room', FORMAT = 1;
 const TABLES = ['dolls', 'garments', 'garmentVersions', 'looks', 'meta'] as const;
 type BlobMeta = Omit<StoredBlob, 'bytes'>;
+const text = new TextEncoder(), untext = new TextDecoder();
 
 export class BackupError extends Error {
   constructor(public code: 'notBackup' | 'tooNew' | 'corrupt') { super(code); }
@@ -13,121 +14,82 @@ export interface BackupCounts { dolls: number; garments: number; looks: number; 
 
 /** Everything (dolls, wardrobe, designs, looks, images) in one ZIP. Images are stored, not re-compressed. */
 export async function exportBackup(onProgress?: (ratio: number) => void): Promise<{ blob: Blob; name: string; counts: BackupCounts }> {
-  const parts: Uint8Array[] = [];
-  let failed: Error | null = null;
-  let finish!: () => void, fail!: (e: Error) => void;
-  const done = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
-  const zip = new Zip((err, chunk, final) => {
-    if (err) { failed = err; fail(err); return; }
-    parts.push(chunk);
-    if (final) finish();
-  });
-  const add = (name: string, data: Uint8Array) => {
-    const f = new ZipPassThrough(name);
-    zip.add(f);
-    f.push(data, true);
-  };
-
+  const zip = new ZipWriter();
   const data: Record<string, unknown[]> = {};
-  for (const t of TABLES) data[t] = await db.table(t).toArray();
+  for (const t of TABLES) data[t] = (await db.table(t).toArray()).filter((r) => !(t === 'meta' && (r as { key: string }).key === 'lastBackupAt'));
   const ids = (await db.blobs.toCollection().primaryKeys()) as string[];
   const counts: BackupCounts = { dolls: data.dolls.length, garments: data.garments.length, looks: data.looks.length, blobs: ids.length };
-  add('manifest.json', strToU8(JSON.stringify({ app: APP, formatVersion: FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), counts })));
-  for (const t of TABLES) add(`data/${t}.json`, strToU8(JSON.stringify(data[t])));
-
-  // Blob metadata first (the reader needs it before the bytes), then the bytes one by one.
+  zip.add('manifest.json', text.encode(JSON.stringify({ app: APP, formatVersion: FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), counts })));
+  for (const t of TABLES) zip.add(`data/${t}.json`, text.encode(JSON.stringify(data[t])));
+  // One image in memory at a time; the writer folds finished bytes into a Blob as it goes.
   const metas: BlobMeta[] = [];
-  await db.blobs.each((b) => { metas.push({ id: b.id, ownerId: b.ownerId, role: b.role, mime: b.mime, w: b.w, h: b.h, size: b.size }); });
-  add('data/blobs.json', strToU8(JSON.stringify(metas)));
   for (let i = 0; i < ids.length; i++) {
-    if (failed) throw failed;
     const rec = await db.blobs.get(ids[i]);
-    if (rec) add(`blobs/${rec.id}`, new Uint8Array(rec.bytes));
+    if (rec) {
+      zip.add(`blobs/${rec.id}`, new Uint8Array(rec.bytes));
+      metas.push({ id: rec.id, ownerId: rec.ownerId, role: rec.role, mime: rec.mime, w: rec.w, h: rec.h, size: rec.bytes.byteLength });
+    }
     onProgress?.((i + 1) / ids.length);
   }
-  zip.end();
-  await done;
-  await db.meta.put({ key: 'lastBackupAt', value: Date.now() });
+  zip.add('data/blobs.json', text.encode(JSON.stringify(metas)));
+  counts.blobs = metas.length;
   const day = new Date().toISOString().slice(0, 10);
-  return { blob: new Blob(parts as BlobPart[], { type: 'application/zip' }), name: `chadar-halbasha-${day}.zip`, counts };
+  return { blob: zip.finish(), name: `chadar-halbasha-${day}.zip`, counts };
 }
 
-/** Replace everything in the app with the contents of a backup file. */
+/** Call once the file has really been handed to the user (share sheet / download). */
+export async function markBackupDone(): Promise<void> {
+  await db.meta.put({ key: 'lastBackupAt', value: Date.now() });
+}
+
+/**
+ * Replace everything in the app with the contents of a backup file.
+ * The whole file is validated BEFORE anything is deleted: complete zip, known format, every image
+ * listed in the index present with the right size. A truncated or foreign file changes nothing.
+ */
 export async function importBackup(file: Blob, onProgress?: (ratio: number) => void): Promise<BackupCounts> {
+  let zip: Awaited<ReturnType<typeof readZip>>;
+  try { zip = await readZip(file); } catch { throw new BackupError('notBackup'); }
+  const json = async <T,>(name: string): Promise<T> => {
+    const e = zip.get(name);
+    if (!e) throw new BackupError('corrupt');
+    try { return JSON.parse(untext.decode(await e.read())) as T; } catch { throw new BackupError('corrupt'); }
+  };
+  if (!zip.has('manifest.json')) throw new BackupError('notBackup');
+  const manifest = await json<{ app?: string; formatVersion?: number; schemaVersion?: number; counts?: BackupCounts }>('manifest.json');
+  if (manifest.app !== APP || manifest.formatVersion !== FORMAT) throw new BackupError('notBackup');
+  if ((manifest.schemaVersion ?? 0) > SCHEMA_VERSION) throw new BackupError('tooNew');
+
   const tables: Record<string, unknown[]> = {};
-  const metas = new Map<string, BlobMeta>();
-  const queue: StoredBlob[] = [];
-  let manifest: { app?: string; formatVersion?: number; schemaVersion?: number; counts?: BackupCounts } | null = null;
-  let error: Error | null = null;
-  let cleared = false;
-  let blobCount = 0;
-
-  const unzip = new Unzip();
-  unzip.register(UnzipInflate);
-  unzip.onfile = (f) => {
-    const chunks: Uint8Array[] = [];
-    f.ondata = (err, chunk, final) => {
-      if (err) { error = new BackupError('corrupt'); return; }
-      chunks.push(chunk.slice()); // the chunk may be a view into the read buffer
-      if (!final) return;
-      let size = 0;
-      for (const c of chunks) size += c.length;
-      const all = new Uint8Array(size);
-      let o = 0;
-      for (const c of chunks) { all.set(c, o); o += c.length; }
-      try {
-        if (f.name === 'manifest.json') manifest = JSON.parse(strFromU8(all));
-        else if (!manifest) error = new BackupError('notBackup');
-        else if (f.name === 'data/blobs.json') for (const m of JSON.parse(strFromU8(all)) as BlobMeta[]) metas.set(m.id, m);
-        else if (f.name.startsWith('data/')) tables[f.name.slice(5, -5)] = JSON.parse(strFromU8(all));
-        else if (f.name.startsWith('blobs/')) {
-          const meta = metas.get(f.name.slice(6));
-          if (meta) queue.push({ ...meta, bytes: all.buffer as ArrayBuffer });
-        }
-      } catch { error = new BackupError('corrupt'); }
-    };
-    f.start();
-  };
-
-  const flush = async () => {
-    if (!manifest) return;
-    if (manifest.app !== APP || manifest.formatVersion !== FORMAT) throw new BackupError('notBackup');
-    if ((manifest.schemaVersion ?? 0) > SCHEMA_VERSION) throw new BackupError('tooNew');
-    if (!cleared) {
-      cleared = true;
-      await db.transaction('rw', db.tables, async () => { for (const t of db.tables) await t.clear(); });
-    }
-    while (queue.length) {
-      const batch = queue.splice(0, 20);
-      await db.blobs.bulkPut(batch);
-      blobCount += batch.length;
-    }
-  };
-
-  const reader = file.stream().getReader();
-  let read = 0;
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (value) { unzip.push(value, false); read += value.length; onProgress?.(read / file.size); }
-      if (error) throw error;
-      await flush();
-      if (done) break;
-    }
-    unzip.push(new Uint8Array(0), true);
-    if (error) throw error;
-    if (!manifest) throw new BackupError('notBackup');
-    await flush();
-    await db.transaction('rw', db.tables, async () => {
-      for (const t of TABLES) if (tables[t]?.length) await db.table(t).bulkPut(tables[t]);
-    });
-  } catch (e) {
-    if (e instanceof BackupError) throw e;
-    throw cleared ? e : new BackupError('notBackup');
+  for (const t of TABLES) {
+    const rows = await json<unknown[]>(`data/${t}.json`);
+    if (!Array.isArray(rows)) throw new BackupError('corrupt');
+    tables[t] = rows;
   }
-  return {
-    dolls: tables.dolls?.length ?? 0, garments: tables.garments?.length ?? 0, looks: tables.looks?.length ?? 0, blobs: blobCount,
-  };
+  const metas = await json<BlobMeta[]>('data/blobs.json');
+  if (!Array.isArray(metas)) throw new BackupError('corrupt');
+  for (const m of metas) if (zip.get(`blobs/${m.id}`)?.size !== m.size) throw new BackupError('corrupt');
+  const c = manifest.counts;
+  if (c && (c.dolls !== tables.dolls.length || c.garments !== tables.garments.length || c.looks !== tables.looks.length || c.blobs !== metas.length)) {
+    throw new BackupError('corrupt');
+  }
+
+  // Point of no return.
+  await db.transaction('rw', db.tables, async () => { for (const t of db.tables) await t.clear(); });
+  let batch: StoredBlob[] = [], batchBytes = 0;
+  const flush = async () => { if (batch.length) { await db.blobs.bulkPut(batch); batch = []; batchBytes = 0; } };
+  for (let i = 0; i < metas.length; i++) {
+    const bytes = await zip.get(`blobs/${metas[i].id}`)!.read();
+    batch.push({ ...metas[i], bytes: bytes.buffer as ArrayBuffer });
+    batchBytes += bytes.length;
+    if (batch.length >= 20 || batchBytes > 16 * 1024 * 1024) await flush();
+    onProgress?.((i + 1) / metas.length);
+  }
+  await flush();
+  await db.transaction('rw', db.tables, async () => {
+    for (const t of TABLES) if (tables[t].length) await db.table(t).bulkPut(tables[t]);
+  });
+  return { dolls: tables.dolls.length, garments: tables.garments.length, looks: tables.looks.length, blobs: metas.length };
 }
 
 export async function lastBackupAt(): Promise<number | null> {

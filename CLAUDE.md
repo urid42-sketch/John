@@ -27,17 +27,22 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   Effects return new canvases; preview on a 720px copy, apply at full size. Warp = per-row scaling sliders.
   Edits bake into `render`; "return to original" rebuilds from source + mask.
 - Looks: `screens/LooksScreen.tsx` (favourites, compare two, export/share). AI results are looks with `ai: true`.
-- Backup: `db/backup.ts`, fflate streaming ZIP (stored), restore replaces everything.
+- Backup: `db/backup.ts` over our own stored-only ZIP (`db/zip.ts`, no fflate). Restore validates the whole file
+  (end record, index, sizes, counts) BEFORE clearing anything, then replaces everything.
 - PWA: hand-written `src/sw.template.js`, emitted as `/sw.js` by the plugin in `vite.config.ts` (no vite-plugin-pwa).
 - AI: `api/ai.js` (Vercel function → fal.ai `fal-ai/nano-banana/edit`, env `FAL_KEY`, `APP_PIN`, optional
   `AI_MODEL`), client in `src/ai/`. Realistic try-on sends a collage + the person photo; text edit in RasterEditor.
+  `APP_PIN` must be ≥ 12 chars or the function answers 501.
+- NO EXTRA COSTS (user decision): the paid automatic AI stays optional and off. The ✦ button in try-on opens a
+  sheet whose primary route is free and manual: save the collage + copy a ready prompt → generate in Higgsfield
+  (their existing plan) → Looks → "הוספת תמונה". Do not make paid services a requirement and do not spend credits.
 - NOT verified in the sandbox (hosts blocked): a real @imgly model run and a real fal.ai call. Nothing was run on
   real iOS Safari. Higgsfield plan credits cannot be used from an app (their API bills separately).
 
 ## Stack
 React 19 + Vite 8 + TypeScript 7, Tailwind v4 · Konva/react-konva · Dexie (IndexedDB) ·
 react-router-dom · @imgly/background-removal in a Web Worker (lazy, AGPL, ~80MB model on first use) ·
-fflate (ZIP backup) · own service worker · Vitest. Deploy: Vercel, Root Directory = `dressing-room`.
+own ZIP backup · own service worker · Vitest. Deploy: Vercel, Root Directory = `dressing-room`.
 
 ## Structure (dressing-room/src)
 `db/` schema, types, blobs, repos, backup · `imaging/` decode/downscale, bg removal, masks, stage-3 tools ·

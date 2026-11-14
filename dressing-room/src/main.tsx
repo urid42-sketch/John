@@ -11,6 +11,13 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => undefined); });
 }
 
+// After a deploy the old lazy chunks are gone; reload once to pick up the new version.
+window.addEventListener('vite:preloadError', () => {
+  if (sessionStorage.getItem('reloaded-for-update')) return;
+  sessionStorage.setItem('reloaded-for-update', '1');
+  location.reload();
+});
+
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
     <App />

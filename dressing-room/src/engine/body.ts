@@ -35,6 +35,10 @@ export function deriveBody(c: BodyCalibration, w: number, h: number): Body {
   const hip = level(c.hipL, c.hipR);
   const ankleC = level(c.ankleL, c.ankleR);
   // Keep the levels ordered even if the dots were dragged carelessly.
+  for (const lv of [shoulder, waist, hip]) { // two dots dragged onto each other must not collapse the body
+    const min = 0.04 * w, mid = (lv.l + lv.r) / 2;
+    if (lv.r - lv.l < min) { lv.l = mid - min / 2; lv.r = mid + min / 2; }
+  }
   waist.y = Math.max(waist.y, shoulder.y + 10);
   hip.y = Math.max(hip.y, waist.y + 10);
   ankleC.y = Math.max(ankleC.y, hip.y + 40);

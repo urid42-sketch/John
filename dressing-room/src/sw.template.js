@@ -20,7 +20,7 @@ async function cacheFirst(request, cacheName) {
   const hit = await cache.match(request);
   if (hit) return hit;
   const res = await fetch(request);
-  if (res.ok || res.type === 'opaque') cache.put(request, res.clone()).catch(() => undefined);
+  if (res.ok) cache.put(request, res.clone()).catch(() => undefined); // never keep errors or opaque responses
   return res;
 }
 
@@ -32,7 +32,18 @@ self.addEventListener('fetch', (event) => {
     if (url.pathname.startsWith('/api/')) return; // never cache AI calls
     if (req.mode === 'navigate') {
       // App shell: try the network for a fresh version, fall back to the cached page offline.
-      event.respondWith(fetch(req).catch(() => caches.match('/index.html', { cacheName: SHELL })));
+      event.respondWith((async () => {
+        const cached = () => caches.match('/index.html', { cacheName: SHELL });
+        try {
+          const res = await Promise.race([
+            fetch(req),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('slow')), 3500)),
+          ]);
+          return res.ok ? res : (await cached()) ?? res;
+        } catch {
+          return (await cached()) ?? Response.error();
+        }
+      })());
       return;
     }
     const big = url.pathname.endsWith('.wasm');

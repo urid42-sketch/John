@@ -181,7 +181,7 @@ function sleevePiece(d: GarmentDesign, b: Body, side: 1 | -1, armpit: Pt): Piece
   const dir = pt((W.x - A0.x) / len, (W.y - A0.y) / len);
   // normal pointing away from the body
   let n = pt(-dir.y, dir.x);
-  if (n.x * side < 0) n = pt(-n.x, -n.y);
+  if (n.x * (S.x - U.x) + n.y * (S.y - U.y) < 0) n = pt(-n.x, -n.y); // "outer" = the shoulder side of the arm
   const topHalf = Math.hypot(S.x - U.x, S.y - U.y) / 2 * 1.08;
   const t = d.sleeves === 'long' ? 1 : d.sleeves === 'puff' ? 0.3 : 0.27;
   const puff = d.sleeves === 'puff';

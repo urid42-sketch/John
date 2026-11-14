@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useNavigate } from 'react-router-dom';
 import { AiGate, aiReady } from '../ai/AiGate';
 import { AiError, aiRequest, toJpegDataUrl, toLookRender } from '../ai/client';
-import { renderLook } from '../canvas/exportLook';
+import { renderLook, shareImage } from '../canvas/exportLook';
 import { getBlob } from '../db/blobs';
 import { normalizeDeg } from '../canvas/gesture';
 import { TryOnStage } from '../canvas/TryOnStage';
@@ -102,6 +102,7 @@ export function TryOnScreen() {
   const [drawer, setDrawer] = useState(false);
   const [tune, setTune] = useState(false);
   const [gate, setGate] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const [working, setWorking] = useState<string | null>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const nav = useNavigate();
@@ -201,8 +202,23 @@ export function TryOnScreen() {
     finally { setWorking(null); }
   };
 
+  /** Free route: a clean picture of the look (white background) to feed any image generator. */
+  const saveCollage = async () => {
+    if (!stageRef.current) return;
+    try {
+      const collage = await renderLook(stageRef.current, false);
+      const flat = await (await fetch(await toJpegDataUrl(collage.png, 1600))).blob();
+      await shareImage(flat, 'look-for-ai');
+    } catch (e) { console.error(e); toastError(errorText(e)); }
+  };
+  const copyPrompt = async () => {
+    try { await navigator.clipboard.writeText(he.ai.manualPrompt); toast(he.ai.promptCopied); }
+    catch { toastError(he.ai.copyFailed); }
+  };
+
   const realistic = async () => {
     if (!stageRef.current || items.length === 0) { toast(he.looks.needItems); return; }
+    setSheet(false);
     if (!aiReady()) { setGate(true); return; }
     setWorking(he.ai.working);
     try {
@@ -290,7 +306,7 @@ export function TryOnScreen() {
               <button className="btn btn-ghost !px-3 text-sm" onClick={() => void saveLook()} disabled={!!working}>
                 <IconHeart />{he.looks.save}
               </button>
-              <button className="btn btn-ghost !px-3 text-sm" onClick={() => void realistic()} disabled={!!working} aria-label={he.ai.button}>
+              <button className="btn btn-ghost !px-3 text-sm" onClick={() => { if (items.length === 0) toast(he.looks.needItems); else setSheet(true); }} disabled={!!working} aria-label={he.ai.button}>
                 <IconSparkle />
               </button>
             </div>
@@ -302,6 +318,24 @@ export function TryOnScreen() {
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-cream/85 p-8 text-center" role="status">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-rose-soft border-t-rose" />
           <p className="max-w-xs">{working}</p>
+        </div>
+      )}
+      {sheet && (
+        <div className="absolute inset-0 z-30 flex flex-col justify-end bg-ink/30" onClick={() => setSheet(false)}>
+          <div className="max-h-[88%] space-y-3 overflow-y-auto rounded-t-3xl bg-paper p-5" role="dialog" aria-label={he.ai.sheetTitle} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-lg">{he.ai.sheetTitle}</h2>
+              <button className="flex h-11 w-11 items-center justify-center" onClick={() => setSheet(false)} aria-label={he.common.close}><IconClose /></button>
+            </div>
+            <p className="text-sm leading-relaxed text-muted">{he.ai.sheetBody}</p>
+            <ol className="list-decimal space-y-1 ps-5 text-sm leading-relaxed">
+              {he.ai.steps.map((s) => <li key={s}>{s}</li>)}
+            </ol>
+            <button className="btn btn-primary w-full" onClick={() => void saveCollage()}>{he.ai.saveCollage}</button>
+            <button className="btn btn-ghost w-full" onClick={() => void copyPrompt()}>{he.ai.copyPrompt}</button>
+            <p dir="ltr" className="max-h-24 select-text overflow-y-auto rounded-2xl bg-cream p-3 text-start text-xs text-muted" style={{ WebkitUserSelect: 'text', userSelect: 'text' }}>{he.ai.manualPrompt}</p>
+            <button className="min-h-11 w-full text-sm text-muted underline" onClick={() => void realistic()}>{he.ai.auto}</button>
+          </div>
         </div>
       )}
       {gate && <AiGate onClose={() => setGate(false)} onReady={() => { setGate(false); void realistic(); }} />}

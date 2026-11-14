@@ -32,8 +32,10 @@ export function StudioEditor() {
   const [selDetail, setSelDetail] = useState<string | null>(null);
   const [sheet, setSheet] = useState<'save' | 'versions' | null>(null);
   const [saving, setSaving] = useState(false);
-  const savedSteps = useRef(0);
-  const dirty = history.steps !== savedSteps.current;
+  const savedDesign = useRef<GarmentDesign | null>(null);
+  const [, bumpSaved] = useState(0);
+  if (savedDesign.current === null) savedDesign.current = design; // a fresh template counts as clean
+  const dirty = design !== savedDesign.current;
 
   const dolls = useLiveQuery(() => db.dolls.toArray(), []);
   const doll = dolls?.find((d) => d.isDefault) ?? dolls?.[0] ?? null;
@@ -48,7 +50,9 @@ export function StudioEditor() {
     if (!id) return;
     db.garments.get(id).then((g) => {
       if (!g || g.body.kind !== 'design') { toastError(he.garment.notFound); nav('/studio', { replace: true }); return; }
-      reset(migrateDesign(g.body.design));
+      const loaded = migrateDesign(g.body.design);
+      savedDesign.current = loaded;
+      reset(loaded);
       setName(g.name);
       setReady(true);
     }).catch((e) => { toastError(errorText(e, he.errors.loadFailed)); nav('/studio', { replace: true }); });
@@ -67,7 +71,8 @@ export function StudioEditor() {
       const g = await saveDesign(asCopy ? `${finalName} (עותק)` : finalName, design, render, asCopy ? undefined : garmentId ?? undefined);
       setGarmentId(g.id);
       setName(g.name);
-      savedSteps.current = history.steps;
+      savedDesign.current = design;
+      bumpSaved((n) => n + 1);
       setSheet(null);
       toast(asCopy ? t.copySaved : t.saved);
     } catch (e) {

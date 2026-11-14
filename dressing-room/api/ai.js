@@ -1,7 +1,7 @@
 // Vercel serverless function: the only place the AI provider key exists.
 // Environment variables (Vercel → Project → Settings → Environment Variables):
 //   FAL_KEY   – API key from fal.ai
-//   APP_PIN   – a code of your choice; the app must send it, so strangers cannot spend your credit
+//   APP_PIN   – a passphrase of at least 12 characters; the app must send it, so strangers cannot spend your credit
 //   AI_MODEL  – optional, defaults to an image-editing model that accepts several reference images
 import { timingSafeEqual } from 'node:crypto';
 
@@ -19,7 +19,7 @@ const editPrompt = (text) =>
   'Keep the same garment type, camera angle and framing unless the request says otherwise. ' +
   'Show only the garment, flat front view, on a plain pure white background, no person, no mannequin, no text.';
 
-const MAX_IMAGE_CHARS = 3_000_000;
+const MAX_IMAGE_CHARS = 1_400_000; // three images must fit Vercel's 4.5MB request limit
 const hits = new Map(); // best-effort rate limit per warm instance
 function limited(ip) {
   const now = Date.now(), list = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
@@ -35,9 +35,11 @@ function samePin(a, b) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
   const key = process.env.FAL_KEY, pin = process.env.APP_PIN;
-  if (!key || !pin) return res.status(501).json({ error: 'not_configured' });
-  if (!samePin(req.headers['x-app-pin'], pin)) return res.status(401).json({ error: 'bad_pin' });
+  // A short code could be guessed, so it does not count as configured.
+  if (!key || !pin || pin.length < 12) return res.status(501).json({ error: 'not_configured' });
+  // Count every attempt (wrong codes included) so guessing is throttled too.
   if (limited(String(req.headers['x-forwarded-for'] ?? 'x').split(',')[0])) return res.status(429).json({ error: 'rate' });
+  if (!samePin(req.headers['x-app-pin'], pin)) return res.status(401).json({ error: 'bad_pin' });
 
   const { mode, images, text } = req.body ?? {};
   const okImages = Array.isArray(images) && images.length >= 1 && images.length <= 3 &&
@@ -56,6 +58,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, image_urls: images, output_format: 'jpeg' }),
+      signal: AbortSignal.timeout(50_000),
     });
     if (!r.ok) {
       console.error('provider error', r.status, (await r.text()).slice(0, 500));
@@ -63,7 +66,7 @@ export default async function handler(req, res) {
     }
     const url = (await r.json())?.images?.[0]?.url;
     if (typeof url !== 'string' || !url.startsWith('https://')) return res.status(502).json({ error: 'no_image' });
-    const img = await fetch(url);
+    const img = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!img.ok) return res.status(502).json({ error: 'no_image' });
     const type = img.headers.get('content-type') ?? 'image/jpeg';
     const buf = Buffer.from(await img.arrayBuffer());
