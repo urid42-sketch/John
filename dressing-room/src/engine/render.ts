@@ -251,3 +251,21 @@ function curveLength(pts: Pt[]): number {
   for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   return t || 1;
 }
+
+/** Stand-in geometry for an imported (raster) garment, so the same details library works on it. */
+export function rasterGeometry(x: number, y: number, w: number, h: number): GarmentGeometry {
+  const cx = x + w / 2;
+  return {
+    pieces: [], unit: w * 0.25, bbox: { x, y, w, h },
+    curves: {
+      waist: [{ x: x + w * 0.12, y: y + h * 0.5 }, { x: cx, y: y + h * 0.5 }, { x: x + w * 0.88, y: y + h * 0.5 }],
+      hem: [{ x: x + w * 0.04, y: y + h * 0.985 }, { x: cx, y: y + h * 0.985 }, { x: x + w * 0.96, y: y + h * 0.985 }],
+      neckline: [{ x: x + w * 0.25, y: y + h * 0.03 }, { x: cx, y: y + h * 0.07 }, { x: x + w * 0.75, y: y + h * 0.03 }],
+      front: [{ x: cx, y }, { x: cx, y: y + h }],
+    },
+  };
+}
+
+export function drawDetails(ctx: CanvasRenderingContext2D, g: GarmentGeometry, design: GarmentDesign) {
+  for (const d of design.details) drawDetail(ctx, d, g, design);
+}

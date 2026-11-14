@@ -187,3 +187,38 @@ export async function saveDesign(name: string, design: GarmentDesign, r: DesignR
 export async function updateDollCalibration(id: ID, calibration: Doll['calibration']): Promise<void> {
   await db.dolls.update(id, { calibration });
 }
+
+// ---- edits of imported (raster) garments ----
+export interface EditedRender { png: Blob; w: number; h: number; thumb: Blob; thumbW: number; thumbH: number }
+
+/** Replace the displayed image of an imported garment, or save the edit as a new garment. */
+export async function saveRasterEdit(g: Garment, r: EditedRender, asCopy: boolean): Promise<Garment> {
+  if (g.body.kind !== 'raster') throw new Error('not a raster garment');
+  const id = asCopy ? crypto.randomUUID() : g.id;
+  const [render, thumb] = await Promise.all([
+    makeStoredBlob(id, 'render', r.png, r.w, r.h),
+    makeStoredBlob(id, 'thumb', r.thumb, r.thumbW, r.thumbH),
+  ]);
+  const now = Date.now();
+  let out!: Garment;
+  await db.transaction('rw', db.garments, db.blobs, async () => {
+    let body = g.body;
+    if (asCopy && g.body.kind === 'raster') {
+      // the copy owns its own original, so deleting one garment never breaks the other
+      const [src, mask] = await Promise.all([db.blobs.get(g.body.source), db.blobs.get(g.body.mask)]);
+      if (src && mask) {
+        const s2 = { ...src, id: crypto.randomUUID(), ownerId: id }, m2 = { ...mask, id: crypto.randomUUID(), ownerId: id };
+        await db.blobs.bulkAdd([s2, m2]);
+        body = { kind: 'raster', source: s2.id, mask: m2.id };
+      }
+    }
+    await db.blobs.bulkAdd([render, thumb]);
+    if (!asCopy) await db.blobs.bulkDelete([g.render, g.thumb]);
+    out = {
+      ...g, id, body, name: asCopy ? `${g.name} (עותק)` : g.name, render: render.id, thumb: thumb.id, w: r.w, h: r.h,
+      createdAt: asCopy ? now : g.createdAt, updatedAt: now,
+    };
+    await db.garments.put(out);
+  });
+  return out;
+}

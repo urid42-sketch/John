@@ -8,6 +8,7 @@ import { DollsScreen } from './screens/DollsScreen';
 import { StudioEditor } from './studio/StudioEditor';
 import { StudioHome } from './studio/StudioHome';
 import { GarmentScreen } from './screens/GarmentScreen';
+import { RasterEditor } from './screens/RasterEditor';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { SoonScreen } from './screens/SoonScreen';
 import { TryOnScreen } from './screens/TryOnScreen';
@@ -59,6 +60,7 @@ export function App() {
         </Route>
         <Route path="import/:kind" element={<div className="mx-auto h-full max-w-xl"><ImportFlow /></div>} />
         <Route path="garment/:id" element={<GarmentScreen />} />
+        <Route path="garment/:id/edit" element={<RasterEditor />} />
         <Route path="studio/new/:template" element={<StudioEditor />} />
         <Route path="studio/edit/:id" element={<StudioEditor key="edit" />} />
         <Route path="dolls" element={<DollsScreen />} />

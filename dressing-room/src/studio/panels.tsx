@@ -112,8 +112,8 @@ const DETAIL_DEFAULTS: Record<DetailKind, Omit<Detail, 'id' | 'kind' | 'color'>>
 };
 export const FREE_KINDS: DetailKind[] = ['bow', 'embroidery', 'sequins'];
 
-export function DetailsPanel({ d, set, selected, onSelect }: {
-  d: GarmentDesign; set: Set; selected: string | null; onSelect: (id: string | null) => void;
+export function DetailsPanel({ d, set, selected, onSelect, noDrag }: {
+  d: GarmentDesign; set: Set; selected: string | null; onSelect: (id: string | null) => void; noDrag?: boolean;
 }) {
   const sel = d.details.find((x) => x.id === selected) ?? null;
   const add = (kind: DetailKind) => {
@@ -174,7 +174,7 @@ export function DetailsPanel({ d, set, selected, onSelect }: {
               <Chips options={t.motifs.map((m, i) => [String(i), m] as const)} value={String(sel.n ?? 0)} onChange={(v) => patch({ n: Number(v) }, 'motif')} />
             </Field>
           )}
-          {FREE_KINDS.includes(sel.kind) && <p className="text-xs text-muted">{t.dragHint}</p>}
+          {!noDrag && FREE_KINDS.includes(sel.kind) && <p className="text-xs text-muted">{t.dragHint}</p>}
           <button className="btn btn-ghost w-full text-sm" onClick={remove}><IconTrash />{t.removeDetail}</button>
         </div>
       )}

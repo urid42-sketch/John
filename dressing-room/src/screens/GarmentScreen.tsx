@@ -68,6 +68,9 @@ export function GarmentScreen() {
         {garment.body.kind === 'design' && (
           <Link to={`/studio/edit/${garment.id}`} className="btn btn-ghost w-full">{he.studio.editInStudio}</Link>
         )}
+        {garment.body.kind === 'raster' && (
+          <Link to={`/garment/${garment.id}/edit`} className="btn btn-ghost w-full">{he.edit.open}</Link>
+        )}
         <MetaForm value={meta} onChange={(m) => { setMeta(m); setDirty(true); }} />
       </div>
     </Page>
