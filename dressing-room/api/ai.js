@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     const r = await fetch(`https://fal.run/${model}`, {
       method: 'POST',
       headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, image_urls: images, num_images: 1, output_format: 'jpeg' }),
+      body: JSON.stringify({ prompt, image_urls: images, output_format: 'jpeg' }),
     });
     if (!r.ok) {
       console.error('provider error', r.status, (await r.text()).slice(0, 500));

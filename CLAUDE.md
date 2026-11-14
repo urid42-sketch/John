@@ -8,30 +8,36 @@ Mobile-first, Hebrew RTL, single user, no login, everything local in IndexedDB.
 project — do not read or modify them.
 
 ## Current stage
-**Stage 1 (MVP) — done, reviewed, waiting for the user's phone test.** Next: Stage 2 (studio, create from scratch).
-Stages: 0 plan ✔ · 1 MVP ✔ · 2 studio from scratch · 3 studio edit imported ·
-4 looks/export/backup/PWA/Vercel · 5 AI (only if user approves).
+**All stages (0-5) are built.** Waiting for: the user's Vercel deploy (see `dressing-room/DEPLOY.md`), a test on
+Aya's iPhone, and — for the realistic try-on — `FAL_KEY` + `APP_PIN` in Vercel env.
+The user asked for the app to be finished autonomously, without stopping for approvals; keep them updated.
 
-User: Aya (name is `USER_NAME` in `i18n/he.ts`), iPhone / Safari. All architect simplifications approved.
+User: Aya (name is `USER_NAME` in `i18n/he.ts`), iPhone / Safari. The user's goal is a REALISTIC result.
 
-Stage 1 state and deviations from ARCHITECTURE.md:
-- No Konva Transformer: custom pointer handling in `canvas/TryOnStage.tsx` (drag, pinch, rotate) + sliders;
-  hit testing is ours (alpha maps from thumbs, `canvas/gesture.ts`), Konva nodes are `listening={false}`.
-- Bg removal: `imaging/bgRemoval.ts` calls the library on the main thread (it proxies to its own worker),
-  runs serialized, asks consent before the first 80MB download, and skips auto-run after a crashed run.
-- Repos are one file (`db/repo.ts`). No Zustand yet (add with the studio store). `GarmentBody` is raster-only.
-- Not built yet: doll calibration (stage 2), looks/backup/PWA (stage 4). Studio and Looks tabs are placeholders.
-- Try-on backdrop: one closet-room illustration, `public/closet.svg`, applied by CSS (`.closet-bg`) behind the
-  transparent Konva canvas; the doll stands on its rug (see `L` in TryOnStage). Stage 4 look export must draw it too.
-- The user's goal is a REALISTIC result. The overlay try-on is the fast/free mode; realism comes from the
-  AI try-on (stage 5), which the user should be asked to approve early rather than treated as optional.
-- NOT verified in the sandbox (model CDN blocked): a real @imgly model run. Needs a check on the phone,
-  together with a 48MP photo import and long-press paste.
+What exists (deviations from ARCHITECTURE.md are deliberate):
+- Try-on: custom pointer handling in `canvas/TryOnStage.tsx` (drag, pinch, rotate) + sliders, own alpha-map hit
+  testing (`canvas/gesture.ts`), no Konva Transformer. Closet backdrop = `public/closet.svg` via CSS `.closet-bg`;
+  `canvas/exportLook.ts` draws it into exported looks.
+- Bg removal: `imaging/bgRemoval.ts`, serialized, consent before the first 80MB download, crash guard.
+- Studio: one generator, 7 presets (`engine/templates.ts`); dress/top is ONE `body` piece; details positioned as
+  fractions of the garment box; `studio/useHistory.ts` (no Zustand). Designs are rendered once on the canonical
+  body and auto-placed on the doll by `newPlacedItem` in `db/repo.ts` (not re-rendered per doll).
+  Versions = design JSON + thumb (`garmentVersions`), cap 20. Calibration: `screens/DollCalibrate.tsx`.
+- Imported-garment editor: `screens/RasterEditor.tsx` + `imaging/rasterOps.ts` + pure `imaging/recolor.ts`.
+  Effects return new canvases; preview on a 720px copy, apply at full size. Warp = per-row scaling sliders.
+  Edits bake into `render`; "return to original" rebuilds from source + mask.
+- Looks: `screens/LooksScreen.tsx` (favourites, compare two, export/share). AI results are looks with `ai: true`.
+- Backup: `db/backup.ts`, fflate streaming ZIP (stored), restore replaces everything.
+- PWA: hand-written `src/sw.template.js`, emitted as `/sw.js` by the plugin in `vite.config.ts` (no vite-plugin-pwa).
+- AI: `api/ai.js` (Vercel function → fal.ai `fal-ai/nano-banana/edit`, env `FAL_KEY`, `APP_PIN`, optional
+  `AI_MODEL`), client in `src/ai/`. Realistic try-on sends a collage + the person photo; text edit in RasterEditor.
+- NOT verified in the sandbox (hosts blocked): a real @imgly model run and a real fal.ai call. Nothing was run on
+  real iOS Safari. Higgsfield plan credits cannot be used from an app (their API bills separately).
 
 ## Stack
-React 19 + Vite 8 + TypeScript 7, Tailwind v4 · Konva/react-konva · Dexie (IndexedDB) · Zustand (planned, stage 2) ·
+React 19 + Vite 8 + TypeScript 7, Tailwind v4 · Konva/react-konva · Dexie (IndexedDB) ·
 react-router-dom · @imgly/background-removal in a Web Worker (lazy, AGPL, ~80MB model on first use) ·
-fflate (ZIP backup) · vite-plugin-pwa · Vitest. Deploy: Vercel, Root Directory = `dressing-room`.
+fflate (ZIP backup) · own service worker · Vitest. Deploy: Vercel, Root Directory = `dressing-room`.
 
 ## Structure (dressing-room/src)
 `db/` schema, types, blobs, repos, backup · `imaging/` decode/downscale, bg removal, masks, stage-3 tools ·
@@ -50,7 +56,7 @@ Full design: `dressing-room/docs/ARCHITECTURE.md` (read only the section you nee
 ## Workflow (cost saving)
 - Main session writes the code. Subagents in `.claude/agents/`: `architect` (stage 0 + end-of-stage review only),
   `senior` (escalation after 2 failures / hard math), `helper` (search, build/lint, typos, README).
-- One stage at a time. End of stage: architect review → commit → update this file → summary table → tell user to `/compact` or `/clear`.
+- After a change: tests + build + Playwright check → commit → push → update this file → short Hebrew summary to the user.
 - Don't read node_modules, dist, lock files. Focused diffs, not full rewrites.
 - Branch: `claude/gallant-wright-bevvul`. No PR unless asked.
 
