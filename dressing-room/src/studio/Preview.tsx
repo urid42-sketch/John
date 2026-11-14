@@ -3,30 +3,11 @@ import { useBlobUrl } from '../db/blobs';
 import type { Doll } from '../db/types';
 import { CANONICAL, CANONICAL_SIZE, DEFAULT_CALIBRATION, deriveBody } from '../engine/body';
 import { generate } from '../engine/generate';
+import { renderMannequin } from '../engine/mannequin';
 import { renderGarment } from '../engine/render';
-import type { Body, GarmentDesign } from '../engine/types';
+import type { GarmentDesign } from '../engine/types';
 import { useFit } from '../ui/useFit';
 import { ensureFabricImage } from './renderDesign';
-
-/** Neutral mannequin for when there is no doll photo yet. */
-function Croquis({ b }: { b: Body }) {
-  const headR = (b.neck.r - b.neck.l) * 0.95, cx = (b.neck.l + b.neck.r) / 2;
-  const d = `M${b.neck.l} ${b.neck.y} L${b.shoulder.l} ${b.shoulder.y} L${b.underarm.l} ${b.underarm.y} L${b.waist.l} ${b.waist.y} L${b.hip.l} ${b.hip.y}
-    L${b.knee.l} ${b.knee.y} L${b.ankle.l} ${b.ankle.y} L${b.ankle.l} ${b.floorY} L${b.innerAnkle.l} ${b.floorY} L${b.innerKnee.l} ${b.knee.y} L${b.cx} ${b.crotchY}
-    L${b.innerKnee.r} ${b.knee.y} L${b.innerAnkle.r} ${b.floorY} L${b.ankle.r} ${b.floorY} L${b.ankle.r} ${b.ankle.y} L${b.knee.r} ${b.knee.y}
-    L${b.hip.r} ${b.hip.y} L${b.waist.r} ${b.waist.y} L${b.underarm.r} ${b.underarm.y} L${b.shoulder.r} ${b.shoulder.y} L${b.neck.r} ${b.neck.y} Z`;
-  const arm = (s: { x: number; y: number }, w: { x: number; y: number }) => <line x1={s.x} y1={s.y + 12} x2={w.x} y2={w.y} strokeWidth={(b.shoulder.r - b.shoulder.l) * 0.17} strokeLinecap="round" />;
-  return (
-    <svg viewBox={`0 0 ${CANONICAL_SIZE.w} ${CANONICAL_SIZE.h}`} className="absolute inset-0 h-full w-full" aria-hidden="true">
-      <g fill="#e7d3c4" stroke="#e7d3c4" strokeLinejoin="round">
-        {arm({ x: b.shoulder.l + 6, y: b.shoulder.y }, b.wristL)}
-        {arm({ x: b.shoulder.r - 6, y: b.shoulder.y }, b.wristR)}
-        <path d={d} strokeWidth={10} />
-        <ellipse cx={cx} cy={b.neck.y - headR * 1.25} rx={headR} ry={headR * 1.25} />
-      </g>
-    </svg>
-  );
-}
 
 /**
  * Live preview: the design is generated for this doll's own body, so it follows her proportions.
@@ -46,6 +27,16 @@ export function Preview({ design, doll, dragDetail, onDragDetail }: {
   );
   const geo = useMemo(() => generate(design, body), [design, body]);
   const [imagesReady, setImagesReady] = useState(0);
+  const mannequin = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = mannequin.current;
+    if (doll || !c || !fit.scale) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const m = renderMannequin(body, size.w, size.h, fit.scale * dpr);
+    c.width = m.width; c.height = m.height;
+    c.getContext('2d')!.drawImage(m, 0, 0);
+    m.width = 0;
+  }, [body, doll, fit.scale, size.w, size.h]);
 
   useEffect(() => {
     let alive = true;
@@ -79,7 +70,7 @@ export function Preview({ design, doll, dragDetail, onDragDetail }: {
         onPointerMove={(e) => { if (dragging.current === e.pointerId) move(e); }}
         onPointerUp={() => { dragging.current = null; }} onPointerCancel={() => { dragging.current = null; }}
       >
-        {doll ? (url && <img src={url} alt="" draggable={false} className="absolute inset-0 h-full w-full" />) : <Croquis b={body} />}
+        {doll ? (url && <img src={url} alt="" draggable={false} className="absolute inset-0 h-full w-full" />) : <canvas ref={mannequin} className="absolute inset-0 h-full w-full" />}
         <canvas
           ref={canvas} className="absolute"
           style={{ left: geo.bbox.x * fit.scale, top: geo.bbox.y * fit.scale, width: geo.bbox.w * fit.scale, height: geo.bbox.h * fit.scale }}

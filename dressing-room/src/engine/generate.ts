@@ -1,7 +1,7 @@
 import { bodyRowAt } from './body';
 import { boxOf, clamp, L, lerp, M, mix, Q, rng, spline, unionBox } from './geometry';
 import { normalizeDesign } from './templates';
-import type { Body, Fold, GarmentDesign, GarmentGeometry, Piece, Profile, Pt, Rect } from './types';
+import type { Body, Bump, Drape, Fold, GarmentDesign, GarmentGeometry, Line, Piece, Profile, Pt, Rect } from './types';
 
 /** Outward flare along the skirt (t: 0 at the waist … 1 at the hem), in hip half-widths. */
 export const PROFILE: Record<Profile, (t: number, tKnee: number, flare: number) => number> = {
@@ -205,6 +205,28 @@ function sleevePiece(d: GarmentDesign, b: Body, side: 1 | -1, armpit: Pt): Piece
   };
 }
 
+/** Pleats for the skirt part: gentle for fitted cuts, strong for full A-line skirts. */
+function drapeFor(d: GarmentDesign, b: Body, hemY: number): Drape | undefined {
+  if (d.type === 'top') return undefined;
+  const hw = (b.hip.r - b.hip.l) / 2;
+  const y0 = d.profile === 'mermaid' ? b.knee.y : b.waist.y + hw * 0.05;
+  const reach = Math.max(1, hemY - y0);
+  const amount = d.profile === 'fitted' ? 0.16 : d.profile === 'mermaid' ? 0.45 + 0.5 * d.flare : 0.3 + 0.9 * d.flare;
+  const n = clamp((2 * Math.PI * reach) / (hw * (1.0 - 0.45 * d.flare)), 6, 40);
+  return { cx: b.cx, y0, reach, amount, n, phase: (d.seed % 628) / 100 };
+}
+
+/** Bust shaping: two soft mounds, stronger for a fitted bodice. */
+function bustBumps(d: GarmentDesign, b: Body): Bump[] {
+  const bw = b.bust.r - b.bust.l, a = 0.75 * (0.35 + 0.65 * d.waistFit);
+  return [-1, 1].map((s) => ({ x: b.cx + s * bw * 0.24, y: b.bust.y + bw * 0.04, r: bw * 0.17, a }));
+}
+
+/** Stitching that follows the hem, set slightly inside the edge. */
+function hemStitch(pts: Pt[], off: number): Line {
+  return { d: M(pt(pts[0].x, pts[0].y - off)) + spline(pts.map((p) => pt(p.x, p.y - off))), dash: true };
+}
+
 function torsoGarment(d: GarmentDesign, b: Body): GarmentGeometry {
   const hemY = hemYOf(d, b);
   const row = silhouette(d, b, hemY);
@@ -216,7 +238,17 @@ function torsoGarment(d: GarmentDesign, b: Body): GarmentGeometry {
   const top = topEdge(d, b, Rside[ROWS], Lside[0]);
   const bodyPath = M(Lside[0]) + spline(Lside) + hem.d + spline(Rside) + top.d + ' Z';
   const bodyPts = [...Lside, ...Rside, ...hem.pts, ...top.pts];
-  const pieces: Piece[] = [{ id: 'body', d: bodyPath, z: 1, folds: skirtFolds(d, b, hemY, row), box: boxOf(bodyPts) }, ...top.extra];
+  const hwB = (b.hip.r - b.hip.l) / 2;
+  const lines: Line[] = [];
+  if (!d.slit) lines.push(hemStitch(hem.pts, hwB * 0.075));
+  if (d.type === 'dress' && d.waistFit > 0.3) {
+    const wr = row(b.waist.y);
+    lines.push({ d: M(pt(wr.l, b.waist.y)) + Q(pt((wr.l + wr.r) / 2, b.waist.y + hwB * 0.1), pt(wr.r, b.waist.y)) });
+  }
+  const pieces: Piece[] = [{
+    id: 'body', d: bodyPath, z: 1, folds: skirtFolds(d, b, hemY, row), box: boxOf(bodyPts),
+    bumps: bustBumps(d, b), drape: drapeFor(d, b, hemY), lines,
+  }, ...top.extra];
   if (top.shoulders && (d.sleeves === 'short' || d.sleeves === 'puff' || d.sleeves === 'long')) {
     pieces.push(sleevePiece(d, b, 1, Rside[ROWS]), sleevePiece(d, b, -1, Lside[0]));
   }
@@ -251,7 +283,10 @@ function skirtGarment(d: GarmentDesign, b: Body): GarmentGeometry {
   const bodyPath = M(Lside[0]) + spline(Lside) + hem.d + spline(Rside) + Q(pt(cx, b.waist.y + hwU * 0.05), Lside[0]) + ' Z';
   const wbH = hwU * 0.16;
   const pieces: Piece[] = [
-    { id: 'body', d: bodyPath, z: 1, folds: skirtFolds(d, b, hemY, row), box: boxOf([...Lside, ...Rside, ...hem.pts]) },
+    {
+      id: 'body', d: bodyPath, z: 1, folds: skirtFolds(d, b, hemY, row), box: boxOf([...Lside, ...Rside, ...hem.pts]),
+      drape: drapeFor(d, b, hemY), lines: d.slit ? [] : [hemStitch(hem.pts, hwU * 0.075)],
+    },
     waistband(b, Lside[0].x, Rside[ROWS].x, wbH),
   ];
   const top = pt(cx, b.waist.y - wbH);

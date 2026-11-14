@@ -1,3 +1,4 @@
+import { presetFabric } from './fabricPresets';
 import type { Fabric, GarmentDesign, GarmentType, Neckline, Sleeves, TemplateId } from './types';
 
 export const TEMPLATE_IDS: TemplateId[] = ['aline', 'bodycon', 'mermaid', 'maxi', 'skirt', 'top', 'pants'];
@@ -24,8 +25,13 @@ const PRESETS: Record<TemplateId, Partial<GarmentDesign>> = {
   pants: { type: 'pants', profile: 'fitted', flare: 0.1, ease: 0.08, hem: HEM_STOPS.maxi },
 };
 
+/** The cloth each pattern is first shown in: chosen so every starting point looks good. */
+export const TEMPLATE_CLOTH: Record<TemplateId, string> = {
+  aline: 'floralPink', bodycon: 'velvetWine', mermaid: 'satinEmerald', maxi: 'satinChampagne', skirt: 'plaidRed', top: 'linenWhite', pants: 'denimDark',
+};
+
 export function fromTemplate(t: TemplateId): GarmentDesign {
-  return normalizeDesign({ ...base(), ...PRESETS[t], template: t, seed: 1 + Math.floor(Math.random() * 1e6) });
+  return normalizeDesign({ ...base(), ...PRESETS[t], fabric: presetFabric(TEMPLATE_CLOTH[t]), template: t, seed: 1 + Math.floor(Math.random() * 1e6) });
 }
 
 /** Which options make sense together; the UI greys out the rest. */

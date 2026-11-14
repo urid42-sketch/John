@@ -21,7 +21,7 @@ export type Neckline = 'v' | 'round' | 'strapless' | 'offShoulder' | 'halter';
 export type Sleeves = 'none' | 'spaghetti' | 'short' | 'puff' | 'long';
 export type TemplateId = 'aline' | 'bodycon' | 'mermaid' | 'maxi' | 'skirt' | 'top' | 'pants';
 
-export type FabricKind = 'solid' | 'satin' | 'lace' | 'denim' | 'floral' | 'plaid' | 'image';
+export type FabricKind = 'solid' | 'satin' | 'velvet' | 'linen' | 'lace' | 'denim' | 'floral' | 'plaid' | 'image';
 export interface Fabric {
   kind: FabricKind;
   colors: string[]; // [base, accent, accent2]
@@ -60,7 +60,15 @@ export interface GarmentDesign {
 
 export type PieceId = 'body' | 'sleeveL' | 'sleeveR' | 'strapL' | 'strapR' | 'band' | 'waistband' | 'legs';
 export interface Fold { a: Pt; b: Pt; width: number; depth: number }
-export interface Piece { id: PieceId; d: string; z: number; folds: Fold[]; box: Rect }
+/** Soft bump in the cloth (bust shaping); coordinates in garment units, radius too. */
+export interface Bump { x: number; y: number; r: number; a: number }
+/** Pleats fanning out of one point (the waist): the way a gathered skirt falls. */
+export interface Drape { cx: number; y0: number; reach: number; amount: number; n: number; phase: number }
+export interface Line { d: string; dash?: boolean }
+export interface Piece {
+  id: PieceId; d: string; z: number; folds: Fold[]; box: Rect;
+  bumps?: Bump[]; drape?: Drape; lines?: Line[];
+}
 export interface GarmentGeometry {
   pieces: Piece[];
   curves: { waist: Pt[]; hem: Pt[]; neckline: Pt[]; front: Pt[] };

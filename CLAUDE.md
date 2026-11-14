@@ -19,6 +19,13 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   testing (`canvas/gesture.ts`), no Konva Transformer. Closet backdrop = `public/closet.jpg` via CSS `.closet-bg`;
   `canvas/exportLook.ts` draws it into exported looks.
 - Bg removal: `imaging/bgRemoval.ts`, serialized, consent before the first 80MB download, crash guard.
+- STUDIO RENDERING (v2, per-pixel): `engine/shade.ts` builds a height field per garment piece (row-cylinder roundness,
+  bust bumps, fold ridges, radial pleats from the waist = `Piece.drape`) and lights it with a key light (satin sheen,
+  velvet rim, lace over a slip); prints are bent along the folds. `engine/render.ts` draws each piece through it, then
+  seams / hem stitching / details. Fabric tiles (`fabricTiles.ts`) are flat colour+weave only and are mip-mapped
+  (`fabricTileFor`) to avoid moiré. `fabricPresets.ts` = 18 one-tap cloths (names in `he.studio.presets`);
+  `mannequin.ts` = lit dress form used when no doll exists and on the studio home cards. Pure parts are unit-tested.
+  Known gaps: detail shapes (bow, belt, buttons, embroidery) are still flat 2D drawings; pants hip area is boxy.
 - Studio: one generator, 7 presets (`engine/templates.ts`); dress/top is ONE `body` piece; details positioned as
   fractions of the garment box; `studio/useHistory.ts` (no Zustand). Designs are rendered once on the canonical
   body and auto-placed on the doll by `newPlacedItem` in `db/repo.ts` (not re-rendered per doll).

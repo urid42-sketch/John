@@ -1,10 +1,11 @@
-import { fabricTile, shade } from './fabricTiles';
+import { fabricTile, fabricTileFor, shade as tint } from './fabricTiles';
 import { along, lerp, rng } from './geometry';
+import { shade as shadePixels, type ShadeMode } from './shade';
 import type { Detail, Fabric, GarmentDesign, GarmentGeometry, Piece, Pt } from './types';
 
 /**
  * Canvas 2D renderer (no SVG filters, no ctx.filter: both are unreliable on Safari).
- * All shading uses `source-atop`, so it only lands on fabric pixels and lace stays see-through.
+ * Each piece is lit per pixel from a height field (see shade.ts); seams and details come after.
  */
 export function renderGarment(g: GarmentGeometry, design: GarmentDesign, scale: number, into?: HTMLCanvasElement): HTMLCanvasElement {
   const c = into ?? document.createElement('canvas');
@@ -13,88 +14,82 @@ export function renderGarment(g: GarmentGeometry, design: GarmentDesign, scale: 
   const ctx = c.getContext('2d')!;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
+  const f = design.fabric;
+  for (const p of g.pieces) drawPiece(ctx, p, f, g, design.seed, scale);
   ctx.setTransform(scale, 0, 0, scale, -g.bbox.x * scale, -g.bbox.y * scale);
-  const tile = fabricTile(design.fabric);
-  for (const p of g.pieces) drawPiece(ctx, p, design.fabric, tile, g, design.seed);
   for (const d of design.details) drawDetail(ctx, d, g, design);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return c;
 }
 
-function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, f: Fabric, tile: HTMLCanvasElement, g: GarmentGeometry, seed: number) {
+function drawPiece(
+  main: CanvasRenderingContext2D, p: Piece, f: Fabric, g: GarmentGeometry, seed: number, scale: number,
+) {
+  const u = g.unit, b = p.box, pad = 3;
+  const pw = Math.max(1, Math.ceil(b.w * scale) + pad * 2), ph = Math.max(1, Math.ceil(b.h * scale) + pad * 2);
+  const pc = document.createElement('canvas');
+  pc.width = pw; pc.height = ph;
+  const ctx = pc.getContext('2d', { willReadFrequently: true })!;
   const path = new Path2D(p.d);
-  const u = g.unit, b = p.box;
-  ctx.save();
-  ctx.clip(path);
+  const toLocal = () => ctx.setTransform(scale, 0, 0, scale, -b.x * scale + pad, -b.y * scale + pad);
 
-  // 1. cloth
-  const pattern = ctx.createPattern(tile, 'repeat');
-  const k = (u / 82) * 0.55 * f.scale; // keep the print the same size relative to the body
-  if (pattern && 'setTransform' in pattern) {
-    pattern.setTransform(new DOMMatrix().translate(b.x, b.y).scale(k));
-    ctx.fillStyle = pattern;
-  } else ctx.fillStyle = pattern ?? f.colors[0];
-  ctx.fillRect(b.x - 2, b.y - 2, b.w + 4, b.h + 4);
+  // 1. the piece's mask
+  toLocal();
+  ctx.fillStyle = '#fff';
+  ctx.fill(path);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const mask = ctx.getImageData(0, 0, pw, ph).data;
+  const alpha = new Uint8ClampedArray(pw * ph);
+  for (let i = 0; i < alpha.length; i++) alpha[i] = mask[i * 4 + 3];
 
+  // 2. per-pixel cloth
+  const X = (x: number) => (x - b.x) * scale + pad, Y = (y: number) => (y - b.y) * scale + pad;
+  const mode: ShadeMode = f.kind === 'satin' ? 'satin' : f.kind === 'velvet' ? 'velvet' : f.kind === 'lace' ? 'lace' : 'matte';
+  const k = (u / 82) * 0.55 * f.scale; // garment units per tile pixel
+  const R = u * scale * 0.85;
+  const lining = f.kind === 'lace' ? lace(f.colors[0]) : undefined;
+  const tile = fabricTileFor(f, 1 / (scale * k));
+  const px = shadePixels({
+    w: pw, h: ph, alpha, R,
+    folds: p.folds.map((fo) => ({ ax: X(fo.a.x), ay: Y(fo.a.y), bx: X(fo.b.x), by: Y(fo.b.y), width: fo.width * scale, depth: fo.depth })),
+    bumps: (p.bumps ?? []).map((bu) => ({ x: X(bu.x), y: Y(bu.y), r: bu.r * scale, a: bu.a })),
+    drape: p.drape ? { ...p.drape, cx: X(p.drape.cx), y0: Y(p.drape.y0), reach: p.drape.reach * scale } : undefined,
+    tile: tile.data, tw: tile.w, th: tile.h,
+    ox: b.x * scale - pad, oy: b.y * scale - pad, ts: tile.ts, warp: R * 0.5,
+    sheen: f.sheen, mode, lining,
+  });
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(px), pw, ph), 0, 0);
+
+  // 3. seams, stitching and a thin turned edge, only where there is cloth
   ctx.globalCompositeOperation = 'source-atop';
-  const small = p.id.startsWith('strap');
-
-  // 2. form: the body is a cylinder: darker toward the sides, a soft highlight off-centre
-  if (!small) {
-    const form = ctx.createLinearGradient(b.x, 0, b.x + b.w, 0);
-    form.addColorStop(0, 'rgba(0,0,0,0.34)'); form.addColorStop(0.2, 'rgba(0,0,0,0.08)');
-    form.addColorStop(0.38, 'rgba(255,255,255,0.10)'); form.addColorStop(0.55, 'rgba(0,0,0,0)');
-    form.addColorStop(0.82, 'rgba(0,0,0,0.10)'); form.addColorStop(1, 'rgba(0,0,0,0.36)');
-    ctx.fillStyle = form;
-    ctx.fillRect(b.x, b.y, b.w, b.h);
+  toLocal();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const lw = Math.max(0.9 / scale, u * 0.017);
+  for (const line of p.lines ?? []) {
+    const lp = new Path2D(line.d);
+    ctx.setLineDash(line.dash ? [u * 0.05, u * 0.04] : []);
+    ctx.save();
+    ctx.translate(0, lw * 0.9);
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = lw; ctx.stroke(lp);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.lineWidth = lw; ctx.stroke(lp);
   }
-
-  // 3. folds: a shadow wedge with a lit ridge beside it
-  for (const fold of p.folds) {
-    const dx = fold.b.x - fold.a.x, dy = fold.b.y - fold.a.y, len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len, ny = dx / len, w = fold.width;
-    const grad = ctx.createLinearGradient(fold.b.x - nx * w, fold.b.y - ny * w, fold.b.x + nx * w, fold.b.y + ny * w);
-    grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(0.42, `rgba(0,0,0,${0.3 * fold.depth})`);
-    grad.addColorStop(0.5, `rgba(0,0,0,${0.12 * fold.depth})`); grad.addColorStop(0.62, `rgba(255,255,255,${0.22 * fold.depth})`);
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.moveTo(fold.a.x, fold.a.y);
-    ctx.lineTo(fold.b.x - nx * w, fold.b.y - ny * w);
-    ctx.lineTo(fold.b.x + nx * w, fold.b.y + ny * w);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // 4. sheen: broad diagonal light bands (satin)
-  if (f.sheen > 0.02 && !small) {
-    for (const [pos, wide] of [[0.3, 0.2], [0.72, 0.13]]) {
-      const x = b.x + b.w * pos;
-      const sg = ctx.createLinearGradient(x - b.w * wide, b.y, x + b.w * wide, b.y + b.h * 0.25);
-      sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, `rgba(255,255,255,${0.42 * f.sheen})`); sg.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = sg;
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-    }
-  }
-
-  // 5. contact shadows: under the top edge and gathering toward the bottom edge
-  if (!small) {
-    const top = ctx.createLinearGradient(0, b.y, 0, b.y + Math.min(b.h, u * 0.5));
-    top.addColorStop(0, 'rgba(0,0,0,0.16)'); top.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = top; ctx.fillRect(b.x, b.y, b.w, u * 0.5);
-    const bot = ctx.createLinearGradient(0, b.y + b.h - u * 0.45, 0, b.y + b.h);
-    bot.addColorStop(0, 'rgba(0,0,0,0)'); bot.addColorStop(1, 'rgba(0,0,0,0.2)');
-    ctx.fillStyle = bot; ctx.fillRect(b.x, b.y + b.h - u * 0.45, b.w, u * 0.45);
-  }
-
-  // 6. all-over sequins
-  if (f.sequins > 0.02) sparkle(ctx, b.x, b.y, b.w, b.h, u, f.sequins, seed + p.id.length, f.colors[0]);
-
-  // 7. edge: a thin darker outline reads as a turned hem
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-  ctx.lineWidth = Math.max(1, u * 0.035);
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(30,14,10,0.3)';
+  ctx.lineWidth = Math.max(1.2 / scale, u * 0.03);
   ctx.stroke(path);
-  ctx.restore();
+  if (f.sequins > 0.02) sparkle(ctx, b.x, b.y, b.w, b.h, u, f.sequins, seed + p.id.length, f.colors[0]);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  main.drawImage(pc, (b.x - g.bbox.x) * scale - pad, (b.y - g.bbox.y) * scale - pad);
+  pc.width = 0; pc.height = 0;
+}
+
+/** Slip colour under lace: a warm, slightly deeper version of the lace colour. */
+function lace(base: string): [number, number, number] {
+  const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(tint(base, 0.25));
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [225, 200, 190];
 }
 
 function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, u: number, amount: number, seed: number, base: string) {
@@ -103,7 +98,7 @@ function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, w: number,
   const n = Math.min(2600, Math.round(((w * h) / (r * r * 9)) * amount));
   for (let i = 0; i < n; i++) {
     const px = x + rand() * w, py = y + rand() * h, t = rand();
-    ctx.fillStyle = t > 0.8 ? 'rgba(255,255,255,0.95)' : t > 0.45 ? shade(base, 0.45) : shade(base, -0.3);
+    ctx.fillStyle = t > 0.8 ? 'rgba(255,255,255,0.95)' : t > 0.45 ? tint(base, 0.45) : tint(base, -0.3);
     ctx.beginPath(); ctx.arc(px, py, r * (0.7 + rand() * 0.7), 0, Math.PI * 2); ctx.fill();
   }
 }
@@ -115,7 +110,7 @@ export function detailPoint(d: Detail, g: GarmentGeometry): Pt {
 
 function drawDetail(ctx: CanvasRenderingContext2D, d: Detail, g: GarmentGeometry, design: GarmentDesign) {
   const u = g.unit, s = d.size;
-  const dark = shade(d.color, -0.35), light = shade(d.color, 0.35);
+  const dark = tint(d.color, -0.35), light = tint(d.color, 0.35);
   ctx.save();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   switch (d.kind) {
@@ -202,7 +197,7 @@ function drawDetail(ctx: CanvasRenderingContext2D, d: Detail, g: GarmentGeometry
       const tail = (dir: 1 | -1) => {
         ctx.beginPath(); ctx.moveTo(c.x, c.y);
         ctx.lineTo(c.x + dir * r * 0.75, c.y + r * 1.35); ctx.lineTo(c.x + dir * r * 0.42, c.y + r * 1.2); ctx.lineTo(c.x + dir * r * 0.25, c.y + r * 1.45);
-        ctx.closePath(); ctx.fillStyle = shade(d.color, -0.12); ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = r * 0.05; ctx.stroke();
+        ctx.closePath(); ctx.fillStyle = tint(d.color, -0.12); ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = r * 0.05; ctx.stroke();
       };
       tail(1); tail(-1); wing(1); wing(-1);
       ctx.fillStyle = d.color; ctx.strokeStyle = dark;

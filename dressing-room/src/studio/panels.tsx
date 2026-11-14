@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { FABRIC_PRESETS } from '../engine/fabricPresets';
 import { allowedSleeves, hasNeckline, hasProfile, hasSlit, HEM_STOPS } from '../engine/templates';
 import type { Detail, DetailKind, FabricKind, GarmentDesign, Neckline, Profile, Sleeves } from '../engine/types';
 import { he } from '../i18n/he';
@@ -6,6 +7,7 @@ import { errorText } from '../ui/errors';
 import { IconImage, IconTrash } from '../ui/icons';
 import { toastError } from '../ui/toast';
 import { Chips, Field, Slider, Swatches } from './controls';
+import { FabricSwatch } from './FabricSwatch';
 import { addFabricImage } from './renderDesign';
 
 type Set = (d: GarmentDesign, key?: string) => void;
@@ -82,6 +84,23 @@ export function FabricPanel({ d, set }: { d: GarmentDesign; set: Set }) {
   return (
     <div className="space-y-4">
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const x = e.target.files?.[0]; e.target.value = ''; void upload(x); }} />
+      <Field label={t.ready}>
+        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
+          {FABRIC_PRESETS.map((p) => {
+            const on = p.fabric.kind === f.kind && p.fabric.colors[0].toLowerCase() === f.colors[0].toLowerCase();
+            return (
+              <button
+                key={p.id} type="button" aria-pressed={on} onClick={() => set({ ...d, fabric: { ...p.fabric, colors: [...p.fabric.colors] } })}
+                className="flex w-16 shrink-0 flex-col items-center gap-1"
+              >
+                <span className={`rounded-full p-0.5 ${on ? 'ring-2 ring-rose' : 'ring-1 ring-line'}`}><FabricSwatch fabric={p.fabric} /></span>
+                <span className="text-center text-[11px] leading-tight text-muted">{t.presets[p.id as keyof typeof t.presets]}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+      <p className="border-t border-line pt-3 text-xs text-muted">{t.custom}</p>
       <Field label={t.fabricKind}>
         <Chips options={entries(t.fabrics)} value={f.kind} onChange={pick} />
       </Field>
