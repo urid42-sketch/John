@@ -37,6 +37,13 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   only after activation in Settings. The user rejected a manual "generate it in Higgsfield" route inside the app,
   so there is none. Realism in the free try-on comes from the photo backdrop and soft shadows (garments, doll,
   floor) in `canvas/TryOnStage.tsx`. Looks → "הוספת תמונה" imports any picture as a look.
+- FREE AUTO-FIT (`engine/autoFit.ts`, pure + tested; wiring in `canvas/autoPlace.ts`): `autoCalibrate` reads
+  shoulders / waist / hips / ankles / wrists from the doll cutout's silhouette (thigh-based fallback when the arms
+  rest against the body), saved as the doll's calibration on import. `fitGarment` scales an imported garment so its
+  own waist lands on her waist, centres it, and returns a per-row widening profile (`PlacedItem.fit`) drawn by
+  `TryOnStage` from a row-warped copy. Runs on every add; "התאמה אוטומטית לגוף" in the tune panel re-runs it.
+- Do NOT spend Higgsfield credits without the user's explicit approval (37 left on 2026-11-14).
+- The user is willing to load about $5 once on fal.ai for the automatic realistic try-on (see DEPLOY.md part ג׳).
 - Backdrop is a photo, `public/closet.jpg` (generated once with the user's Higgsfield account, with permission to
   use it for site assets only). The doll's feet sit on its rug: see `L` in TryOnStage if the image changes.
 - Cloud environment `john-dressing-room` allows d8j0ntlcm91z4.cloudfront.net (Higgsfield images) and

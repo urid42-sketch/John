@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { addToDraft, deleteGarment, updateGarmentMeta, type GarmentMeta } from '../db/repo';
+import { addToDraftFitted } from '../canvas/autoPlace';
+import { deleteGarment, updateGarmentMeta, type GarmentMeta } from '../db/repo';
 import { db } from '../db/schema';
 import { he } from '../i18n/he';
 import { MetaForm } from '../import/MetaForm';
@@ -37,7 +38,7 @@ export function GarmentScreen() {
   const tryOn = async () => {
     try {
       if (dirty) await save();
-      await addToDraft(garment);
+      await addToDraftFitted(garment);
       nav('/');
     } catch (e) { toastError(errorText(e)); }
   };

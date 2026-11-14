@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useNavigate } from 'react-router-dom';
 import { AiGate, aiReady } from '../ai/AiGate';
 import { AiError, aiRequest, toJpegDataUrl, toLookRender } from '../ai/client';
+import { autoPlace, refit } from '../canvas/autoPlace';
 import { renderLook } from '../canvas/exportLook';
 import { getBlob } from '../db/blobs';
 import { normalizeDeg } from '../canvas/gesture';
 import { TryOnStage } from '../canvas/TryOnStage';
-import { addLook, getDraft, newPlacedItem, saveDraft } from '../db/repo';
+import { addLook, getDraft, saveDraft } from '../db/repo';
 import { db } from '../db/schema';
 import { CATEGORIES, DRAFT_LOOK_ID, type Category, type Garment, type ID, type PlacedItem } from '../db/types';
 import { he } from '../i18n/he';
@@ -182,11 +183,17 @@ export function TryOnScreen() {
     update(items.filter((i) => i.id !== sel.id));
     setSelectedId(null);
   };
-  const add = (g: Garment) => {
-    const it = newPlacedItem(g, items, doll);
+  const add = async (g: Garment) => {
+    setDrawer(false);
+    const it = await autoPlace(g, doll, items);
     update([...items, it]);
     setSelectedId(it.id);
-    setDrawer(false);
+  };
+  const refitSel = async () => {
+    const g = sel && garments.get(sel.garmentId);
+    if (!sel || !g) return;
+    const next = await refit(sel, g, doll);
+    update(items.map((i) => (i.id === sel.id ? next : i)));
   };
   const switchDoll = (id: ID) => { setDollId(id); persist(items, id); };
 
@@ -257,6 +264,7 @@ export function TryOnScreen() {
       <div className="relative border-t border-line bg-paper px-3 py-2">
         {sel && tune && (
           <div className="absolute inset-x-0 bottom-full space-y-1 border-t border-line bg-paper px-4 py-2">
+            <button className="btn btn-ghost mb-1 w-full !min-h-11 text-sm" onClick={() => void refitSel()}>{he.tryon.refit}</button>
             {([
               ['size', 3, 160, Math.round(sel.scale * 100), (v: number) => ({ scale: v / 100 })],
               ['width', 50, 180, Math.round(sel.stretchX * 100), (v: number) => ({ stretchX: v / 100 })],
@@ -307,7 +315,7 @@ export function TryOnScreen() {
         </div>
       )}
       {gate && <AiGate onClose={() => setGate(false)} onReady={() => { setGate(false); void realistic(); }} />}
-      {drawer && <WardrobeDrawer garments={garmentList ?? []} onPick={add} onClose={() => setDrawer(false)} />}
+      {drawer && <WardrobeDrawer garments={garmentList ?? []} onPick={(g) => void add(g)} onClose={() => setDrawer(false)} />}
     </div>
   );
 }

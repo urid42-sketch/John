@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useBlobUrl } from '../db/blobs';
+import { detectCalibration } from '../canvas/autoPlace';
+import { getBlob, useBlobUrl } from '../db/blobs';
 import { updateDollCalibration } from '../db/repo';
 import { db } from '../db/schema';
 import type { BodyCalibration } from '../db/types';
@@ -49,6 +50,11 @@ export function DollCalibrate() {
   if (doll === undefined) return <Page title={he.calibrate.title}>{null}</Page>;
   if (doll === null) return <Page title={he.calibrate.title}><p className="p-8 text-center text-muted">{he.garment.notFound}</p></Page>;
 
+  const detect = async () => {
+    const blob = await getBlob(doll.cutout).catch(() => null);
+    const found = blob ? await detectCalibration(blob) : null;
+    if (found) setCal(found); else { setCal(DEFAULT_CALIBRATION); toastError(he.calibrate.detectFailed); }
+  };
   const save = async () => {
     try { await updateDollCalibration(doll.id, cal); toast(he.calibrate.saved); nav(-1); }
     catch (e) { toastError(errorText(e, he.errors.saveFailed)); }
@@ -59,7 +65,7 @@ export function DollCalibrate() {
       title={he.calibrate.title}
       footer={
         <div className="flex gap-2">
-          <button className="btn btn-ghost" onClick={() => setCal(DEFAULT_CALIBRATION)}>{he.calibrate.reset}</button>
+          <button className="btn btn-ghost !px-4" onClick={() => void detect()}>{he.calibrate.detect}</button>
           <button className="btn btn-primary flex-1" onClick={() => void save()}>{he.common.save}</button>
         </div>
       }

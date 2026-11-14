@@ -48,6 +48,8 @@ export interface PlacedItem {
   x: number; y: number; // centre, as a fraction of doll width / height
   scale: number; // garment height / doll height
   stretchX: number; rotation: number; flipX: boolean; z: number;
+  /** automatic body fit: horizontal scale per row, top → bottom (see engine/autoFit.ts) */
+  fit?: number[];
 }
 
 export interface Look {

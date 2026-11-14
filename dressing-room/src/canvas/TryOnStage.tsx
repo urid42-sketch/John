@@ -5,6 +5,7 @@ import { getBlob, useBlobUrl } from '../db/blobs';
 import type { BlobRef, Doll, Garment, ID, PlacedItem, Pt } from '../db/types';
 import { ctx2d, decodeToCanvas, releaseCanvas } from '../imaging/load';
 import { useFit } from '../ui/useFit';
+import { fitScaleAt } from '../engine/autoFit';
 import { hitsAlpha, normalizeDeg, pinchTransform, toLocalUnit, type AlphaMap } from './gesture';
 
 Konva.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -54,16 +55,41 @@ function useAlphaMaps(garments: Garment[]): Map<ID, AlphaMap> {
   return maps.current;
 }
 
+// Row-warped copies of garment images for items with an automatic body fit (small LRU cache).
+const warped = new Map<string, HTMLCanvasElement>();
+const maxFit = (fit: number[] | undefined) => (fit?.length ? Math.max(1, ...fit) : 1);
+function warpedImage(img: HTMLImageElement, key: string, fit: number[]): HTMLCanvasElement {
+  const id = `${key}:${fit.join(',')}`;
+  const hit = warped.get(id);
+  if (hit) { warped.delete(id); warped.set(id, hit); return hit; }
+  const w = img.naturalWidth, h = img.naturalHeight, W = Math.ceil(w * maxFit(fit));
+  const c = document.createElement('canvas');
+  c.width = W; c.height = h;
+  const ctx = ctx2d(c);
+  const STRIP = 2; // px rows per strip: smooth enough, half the draw calls
+  for (let y = 0; y < h; y += STRIP) {
+    const dw = w * fitScaleAt(fit, (y + STRIP / 2) / h);
+    ctx.drawImage(img, 0, y, w, STRIP, (W - dw) / 2, y, dw, STRIP);
+  }
+  warped.set(id, c);
+  if (warped.size > 6) { const oldest = warped.keys().next().value!; releaseCanvas(warped.get(oldest)); warped.delete(oldest); }
+  return c;
+}
+
 interface Layout { ox: number; oy: number; dw: number; dh: number }
 /** Stage-pixel geometry of an item. */
 function geom(it: PlacedItem, g: Garment, L: Layout) {
   const h = it.scale * L.dh;
-  const w = h * (g.w / g.h) * it.stretchX;
+  const w = h * (g.w / g.h) * it.stretchX * maxFit(it.fit);
   return { cx: L.ox + it.x * L.dw, cy: L.oy + it.y * L.dh, w, h };
 }
 
 function ItemNode({ item, garment, L }: { item: PlacedItem; garment: Garment; L: Layout }) {
-  const img = useHtmlImage(garment.render);
+  const raw = useHtmlImage(garment.render);
+  const img = useMemo(
+    () => (raw && item.fit?.length ? warpedImage(raw, garment.render, item.fit) : raw),
+    [raw, garment.render, item.fit],
+  );
   if (!img) return null;
   const { cx, cy, w, h } = geom(item, garment, L);
   return (
