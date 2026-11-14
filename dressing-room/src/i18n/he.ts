@@ -145,6 +145,7 @@ export const he = {
     detailHost: 'מיקום', hosts: { hem: 'בשוליים', neckline: 'במחשוף' }, motif: 'דוגמה', motifs: ['ענף', 'פרח', 'לב'],
     dragHint: 'אפשר גם לגרור את הפרט על הבגד', removeDetail: 'הסרת הפרט',
     undo: 'בטל', redo: 'בצע שוב', versions: 'גרסאות', save: 'שמירה', saveCopy: 'שמירה כעותק',
+    rotateHint: 'גררי כדי לסובב · שתי אצבעות לקירוב', view3d: 'תלת־ממד', viewOnMe: 'על הדמות', no3d: 'התצוגה התלת־ממדית לא זמינה במכשיר הזה',
     savedTitle: 'העיצוב נשמר בארון', tryNow: 'למדוד עכשיו', keepDesigning: 'להמשיך לעצב',
     saveTitle: 'שמירת העיצוב', namePlaceholder: 'שם לעיצוב', saved: 'העיצוב נשמר בארון', copySaved: 'נשמר כעותק חדש',
     versionsTitle: 'גרסאות קודמות', versionsEmpty: 'גרסאות נוצרות בכל שמירה.', restore: 'חזרה לגרסה הזו', restored: 'הגרסה נטענה. לחצי ״שמירה״ כדי לשמור אותה.',

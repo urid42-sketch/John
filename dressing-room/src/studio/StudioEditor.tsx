@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { saveDesign } from '../db/repo';
 import { db } from '../db/schema';
@@ -16,6 +16,8 @@ import { CutPanel, DetailsPanel, FabricPanel, FREE_KINDS } from './panels';
 import { Preview } from './Preview';
 import { renderDesignForSave } from './renderDesign';
 import { useHistory } from './useHistory';
+
+const Viewer3D = lazy(() => import('../studio3d/Viewer')); // three.js loads only when the studio opens
 
 const t = he.studio;
 type Tab = 'cut' | 'fabric' | 'details';
@@ -34,6 +36,7 @@ export function StudioEditor() {
   const [sheet, setSheet] = useState<'save' | 'versions' | 'saved' | null>(null);
   const lastSaved = useRef<Garment | null>(null);
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState<'3d' | 'doll'>('3d');
   const savedDesign = useRef<GarmentDesign | null>(null);
   const [, bumpSaved] = useState(0);
   if (savedDesign.current === null) savedDesign.current = design; // a fresh template counts as clean
@@ -99,15 +102,28 @@ export function StudioEditor() {
       </header>
 
       <div className="relative min-h-0 flex-[5] bg-paper">
-        <Preview
-          design={design} doll={doll}
-          dragDetail={tab === 'details' && !!sel && FREE_KINDS.includes(sel.kind)}
-          onDragDetail={(x, y) => { if (sel) set({ ...design, details: design.details.map((d) => (d.id === sel.id ? { ...d, x, y } : d)) }, `${sel.id}:drag`); }}
-        />
-        {doll && tab === 'cut' && (
+        {view === '3d' ? (
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted" role="status">{he.common.loading}</div>}>
+            <Viewer3D design={design} onUnavailable={() => { setView('doll'); toastError(t.no3d); }} />
+          </Suspense>
+        ) : (
+          <Preview
+            design={design} doll={doll}
+            dragDetail={tab === 'details' && !!sel && FREE_KINDS.includes(sel.kind)}
+            onDragDetail={(x, y) => { if (sel) set({ ...design, details: design.details.map((d) => (d.id === sel.id ? { ...d, x, y } : d)) }, `${sel.id}:drag`); }}
+          />
+        )}
+        <div className="absolute start-2 top-2 flex rounded-full border border-line bg-paper/90 p-0.5 text-xs" role="group">
+          {(['3d', 'doll'] as const).map((v) => (
+            <button key={v} aria-pressed={view === v} onClick={() => setView(v)} className={`min-h-9 rounded-full px-3 ${view === v ? 'bg-rose text-white' : 'text-muted'}`}>
+              {v === '3d' ? t.view3d : t.viewOnMe}
+            </button>
+          ))}
+        </div>
+        {view === 'doll' && doll && tab === 'cut' && (
           <Link to={`/dolls/${doll.id}/calibrate`} className="absolute end-2 top-2 flex min-h-10 items-center rounded-full bg-cream/90 px-3 text-xs text-muted">{t.calibrate}</Link>
         )}
-        {dolls && !doll && <p className="absolute inset-x-0 bottom-1 px-6 text-center text-xs text-muted">{t.noDoll}</p>}
+        {view === 'doll' && dolls && !doll && <p className="absolute inset-x-0 bottom-1 px-6 text-center text-xs text-muted">{t.noDoll}</p>}
       </div>
 
       <div className="flex border-y border-line bg-paper" role="tablist">

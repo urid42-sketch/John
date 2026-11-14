@@ -24,6 +24,13 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   an empty try-on stage, `/help` screen (`screens/HelpScreen.tsx`, texts in `he.guide`), after saving a design a sheet
   offers "try it on now", after importing a garment you land on its page. Principle: every empty screen points to the
   next action; keep adding guidance in this spirit.
+- 3D STUDIO (user asked for a rotatable, realistic tailor's dress form like a photo they sent; three.js approved):
+  `studio3d/form.ts` (pure, tested) = the form's slices, `garmentShell` (design → tube of cloth that follows the body,
+  hangs, flares and pleats) and `hasCloth` (necklines / armholes / straps as a cut-out mask). `studio3d/Viewer.tsx`
+  (lazy chunk, ~145KB gz) = velvet torso on a pole with a wooden stand, PBR cloth materials from the same fabric
+  tiles, OrbitControls, render on demand. The studio editor shows it by default with a "תלת־ממד / על הדמות" toggle;
+  saving still uses the 2D render (wardrobe, try-on). In 3D only belt, buttons and bow details are shown; sleeves are
+  simple caps / hanging tubes; no cloth simulation. Imported photo garments stay 2D by nature.
 - `engine/mannequin.ts` = glossy ivory shop mannequin, parts lit separately (arms, legs, torso over the joints, egg
   head). Used in the studio preview without a doll, on the template cards and as the starter doll.
 - STUDIO RENDERING (v2, per-pixel): `engine/shade.ts` builds a height field per garment piece (row-cylinder roundness,
