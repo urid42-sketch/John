@@ -23,7 +23,10 @@ export function DollsScreen() {
           <li key={d.id} className={`rounded-3xl border bg-paper p-3 ${d.isDefault ? 'border-rose' : 'border-line'}`}>
             <div className="aspect-[3/5]"><Thumb blob={d.thumb} alt={d.name} /></div>
             <p className="mt-2 truncate text-center text-sm">{d.name}</p>
-            <div className="mt-2 flex items-center gap-1">
+            <Link to={`/dolls/${d.id}/calibrate`} className="mt-1 flex min-h-11 items-center justify-center text-sm text-rose-deep underline">
+              {he.dolls.calibrate}
+            </Link>
+            <div className="flex items-center gap-1">
               {d.isDefault ? (
                 <span className="flex min-h-11 flex-1 items-center justify-center text-sm text-rose-deep">{he.dolls.isDefault}</span>
               ) : (

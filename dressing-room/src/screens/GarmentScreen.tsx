@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { addToDraft, deleteGarment, updateGarmentMeta, type GarmentMeta } from '../db/repo';
 import { db } from '../db/schema';
 import { he } from '../i18n/he';
@@ -65,6 +65,9 @@ export function GarmentScreen() {
         <div className="checker mx-auto aspect-[3/4] max-h-[42vh] rounded-3xl border border-line p-3">
           <Thumb blob={garment.render} alt={garment.name} />
         </div>
+        {garment.body.kind === 'design' && (
+          <Link to={`/studio/edit/${garment.id}`} className="btn btn-ghost w-full">{he.studio.editInStudio}</Link>
+        )}
         <MetaForm value={meta} onChange={(m) => { setMeta(m); setDirty(true); }} />
       </div>
     </Page>

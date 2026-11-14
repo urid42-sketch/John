@@ -3,7 +3,10 @@ import { Link, Outlet, Route, Routes } from 'react-router-dom';
 import { db } from './db/schema';
 import { he } from './i18n/he';
 import { ImportFlow } from './import/ImportFlow';
+import { DollCalibrate } from './screens/DollCalibrate';
 import { DollsScreen } from './screens/DollsScreen';
+import { StudioEditor } from './studio/StudioEditor';
+import { StudioHome } from './studio/StudioHome';
 import { GarmentScreen } from './screens/GarmentScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { SoonScreen } from './screens/SoonScreen';
@@ -51,12 +54,15 @@ export function App() {
         <Route element={<Shell />}>
           <Route index element={<TryOnScreen />} />
           <Route path="wardrobe" element={<WardrobeScreen />} />
-          <Route path="studio" element={<SoonScreen title={he.soon.studio} body={he.soon.studioBody} />} />
+          <Route path="studio" element={<StudioHome />} />
           <Route path="looks" element={<SoonScreen title={he.soon.looks} body={he.soon.looksBody} />} />
         </Route>
         <Route path="import/:kind" element={<div className="mx-auto h-full max-w-xl"><ImportFlow /></div>} />
         <Route path="garment/:id" element={<GarmentScreen />} />
+        <Route path="studio/new/:template" element={<StudioEditor />} />
+        <Route path="studio/edit/:id" element={<StudioEditor key="edit" />} />
         <Route path="dolls" element={<DollsScreen />} />
+        <Route path="dolls/:id/calibrate" element={<DollCalibrate />} />
         <Route path="settings" element={<SettingsScreen />} />
         <Route path="*" element={<Shell />} />
       </Routes>

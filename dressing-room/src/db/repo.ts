@@ -1,8 +1,10 @@
 import { db } from './schema';
 import { makeStoredBlob } from './blobs';
+import { CANONICAL, DEFAULT_CALIBRATION, deriveBody } from '../engine/body';
+import type { GarmentDesign } from '../engine/types';
 import {
   buildTagIndex, DRAFT_LOOK_ID,
-  type Category, type Doll, type Garment, type ID, type Look, type PlacedItem, type Tags,
+  type Category, type Doll, type Garment, type GarmentVersion, type ID, type Look, type PlacedItem, type Tags,
 } from './types';
 
 export interface CutoutResult {
@@ -80,8 +82,9 @@ export async function updateGarmentMeta(id: ID, meta: GarmentMeta): Promise<void
 }
 
 export async function deleteGarment(id: ID): Promise<void> {
-  await db.transaction('rw', db.garments, db.blobs, async () => {
+  await db.transaction('rw', db.garments, db.garmentVersions, db.blobs, async () => {
     await db.garments.delete(id);
+    await db.garmentVersions.where('garmentId').equals(id).delete();
     await db.blobs.where('ownerId').equals(id).delete();
   });
 }
@@ -110,18 +113,77 @@ const PLACEMENT: Record<Category, { y: number; scale: number }> = {
   accessory: { y: 0.2, scale: 0.12 },
 };
 
-export function newPlacedItem(g: Pick<Garment, 'id' | 'category'>, existing: PlacedItem[]): PlacedItem {
-  const p = PLACEMENT[g.category];
+/**
+ * Where a new item lands on the doll. Studio designs know their place on the reference body,
+ * so they are mapped onto this doll's own proportions; imported photos use a per-category guess.
+ */
+export function newPlacedItem(g: Garment, existing: PlacedItem[], doll: Doll | null): PlacedItem {
   const z = existing.reduce((m, i) => Math.max(m, i.z), 0) + 1;
-  return {
-    id: crypto.randomUUID(), garmentId: g.id, x: 0.5, y: p.y, scale: p.scale,
+  const item: PlacedItem = {
+    id: crypto.randomUUID(), garmentId: g.id, x: 0.5, y: PLACEMENT[g.category].y, scale: PLACEMENT[g.category].scale,
     stretchX: 1, rotation: 0, flipX: false, z,
   };
+  if (g.body.kind !== 'design' || !doll) return item;
+  const f = g.body.bodyFrame, C = CANONICAL;
+  const b = deriveBody(doll.calibration ?? DEFAULT_CALIBRATION, doll.w, doll.h);
+  const ky = (b.ankle.y - b.shoulder.y) / (C.ankle.y - C.shoulder.y);
+  const kx = ((b.shoulder.r - b.shoulder.l) / (C.shoulder.r - C.shoulder.l) + (b.hip.r - b.hip.l) / (C.hip.r - C.hip.l)) / 2;
+  const cx = b.cx + (f.x + f.w / 2 - C.cx) * kx;
+  const cy = b.shoulder.y + (f.y + f.h / 2 - C.shoulder.y) * ky;
+  return { ...item, x: cx / doll.w, y: cy / doll.h, scale: (f.h * ky) / doll.h, stretchX: Math.min(1.8, Math.max(0.5, kx / ky)) };
 }
 
 export async function addToDraft(g: Garment): Promise<void> {
-  await db.transaction('rw', db.looks, async () => {
+  await db.transaction('rw', db.looks, db.dolls, async () => {
     const d = await getDraft();
-    await db.looks.put({ ...d, items: [...d.items, newPlacedItem(g, d.items)], updatedAt: Date.now() });
+    const dolls = await db.dolls.toArray();
+    const doll = dolls.find((x) => x.id === d.dollId) ?? dolls.find((x) => x.isDefault) ?? dolls[0] ?? null;
+    await db.looks.put({ ...d, items: [...d.items, newPlacedItem(g, d.items, doll)], updatedAt: Date.now() });
   });
+}
+
+// ---- studio designs ----
+const MAX_VERSIONS = 20;
+const DESIGN_CATEGORY: Record<GarmentDesign['type'], Category> = { dress: 'dress', top: 'top', skirt: 'skirt', pants: 'pants' };
+
+export interface DesignRender {
+  png: Blob; w: number; h: number; thumb: Blob; thumbW: number; thumbH: number;
+  frame: { x: number; y: number; w: number; h: number };
+}
+
+/** Create a designed garment, or update one in place (pass its id). Every save adds a version. */
+export async function saveDesign(name: string, design: GarmentDesign, r: DesignRender, id?: ID): Promise<Garment> {
+  const gid = id ?? crypto.randomUUID();
+  const [render, thumb, vThumb] = await Promise.all([
+    makeStoredBlob(gid, 'render', r.png, r.w, r.h),
+    makeStoredBlob(gid, 'thumb', r.thumb, r.thumbW, r.thumbH),
+    makeStoredBlob(gid, 'thumb', r.thumb, r.thumbW, r.thumbH),
+  ]);
+  const now = Date.now();
+  let out!: Garment;
+  await db.transaction('rw', db.garments, db.garmentVersions, db.blobs, async () => {
+    const prev = id ? await db.garments.get(id) : undefined;
+    await db.blobs.bulkAdd([render, thumb, vThumb]);
+    if (prev) await db.blobs.bulkDelete([prev.render, prev.thumb]);
+    const tags = prev?.tags ?? { colors: [], occasions: [], seasons: [], free: [] };
+    out = {
+      id: gid, name, category: DESIGN_CATEGORY[design.type], tags, tagIndex: buildTagIndex(tags),
+      favorite: prev?.favorite ?? false, createdAt: prev?.createdAt ?? now, updatedAt: now,
+      render: render.id, thumb: thumb.id, w: r.w, h: r.h,
+      body: { kind: 'design', design, bodyFrame: r.frame }, origin: { type: 'studio' },
+    };
+    await db.garments.put(out);
+    const version: GarmentVersion = { id: crypto.randomUUID(), garmentId: gid, createdAt: now, design, thumb: vThumb.id };
+    await db.garmentVersions.add(version);
+    const all = await db.garmentVersions.where('garmentId').equals(gid).sortBy('createdAt');
+    for (const old of all.slice(0, Math.max(0, all.length - MAX_VERSIONS))) {
+      await db.garmentVersions.delete(old.id);
+      await db.blobs.delete(old.thumb);
+    }
+  });
+  return out;
+}
+
+export async function updateDollCalibration(id: ID, calibration: Doll['calibration']): Promise<void> {
+  await db.dolls.update(id, { calibration });
 }

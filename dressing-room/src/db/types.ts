@@ -1,3 +1,5 @@
+import type { GarmentDesign } from '../engine/types';
+
 export type ID = string;
 export type BlobRef = ID;
 export type Pt = { x: number; y: number };
@@ -25,8 +27,13 @@ export type Season = 'summer' | 'winter' | 'spring' | 'autumn';
 export const SEASONS: Season[] = ['summer', 'winter', 'spring', 'autumn'];
 export interface Tags { colors: string[]; occasions: string[]; seasons: Season[]; free: string[] }
 
-/** Stage 1 has raster garments only; the `design` kind arrives with the studio (stage 2). */
-export type GarmentBody = { kind: 'raster'; source: BlobRef; mask: BlobRef };
+/** Imported photo (raster) or a garment designed in the studio (parametric design). */
+export type GarmentBody =
+  | { kind: 'raster'; source: BlobRef; mask: BlobRef }
+  | { kind: 'design'; design: GarmentDesign; bodyFrame: { x: number; y: number; w: number; h: number } };
+
+/** Explicit saves of a studio design (capped, oldest pruned). */
+export interface GarmentVersion { id: ID; garmentId: ID; createdAt: number; design: GarmentDesign; thumb: BlobRef }
 
 export interface Garment {
   id: ID; name: string; category: Category; tags: Tags; tagIndex: string[];

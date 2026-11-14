@@ -1,11 +1,12 @@
 import Dexie, { type Table } from 'dexie';
-import type { Doll, Garment, Look, MetaEntry, StoredBlob } from './types';
+import type { Doll, Garment, GarmentVersion, Look, MetaEntry, StoredBlob } from './types';
 
 export const SCHEMA_VERSION = 1;
 
 class DressingRoomDB extends Dexie {
   dolls!: Table<Doll, string>;
   garments!: Table<Garment, string>;
+  garmentVersions!: Table<GarmentVersion, string>;
   looks!: Table<Look, string>;
   blobs!: Table<StoredBlob, string>;
   meta!: Table<MetaEntry, string>;

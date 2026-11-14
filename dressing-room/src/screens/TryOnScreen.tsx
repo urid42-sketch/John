@@ -174,7 +174,7 @@ export function TryOnScreen() {
     setSelectedId(null);
   };
   const add = (g: Garment) => {
-    const it = newPlacedItem(g, items);
+    const it = newPlacedItem(g, items, doll);
     update([...items, it]);
     setSelectedId(it.id);
     setDrawer(false);
