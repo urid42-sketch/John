@@ -7,7 +7,7 @@ function loadBackdrop(): Promise<HTMLImageElement> {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => { backdrop = null; reject(new Error('backdrop')); };
-    img.src = '/closet.svg';
+    img.src = '/closet.jpg';
   });
   return backdrop;
 }
@@ -25,11 +25,11 @@ export async function renderLook(stage: Konva.Stage, withBackdrop = true): Promi
   const out = makeCanvas(layer.width, layer.height);
   const ctx = ctx2d(out);
   if (withBackdrop) {
-    ctx.fillStyle = '#f1e8df';
+    ctx.fillStyle = '#e9dccb';
     ctx.fillRect(0, 0, out.width, out.height);
     try {
       const bg = await loadBackdrop();
-      const bw = 400, bh = 640; // viewBox of closet.svg
+      const bw = bg.naturalWidth, bh = bg.naturalHeight;
       const k = Math.max(out.width / bw, out.height / bh);
       ctx.drawImage(bg, (out.width - bw * k) / 2, out.height - bh * k, bw * k, bh * k);
     } catch { /* plain backdrop colour is fine */ }

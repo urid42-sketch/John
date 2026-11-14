@@ -16,7 +16,7 @@ User: Aya (name is `USER_NAME` in `i18n/he.ts`), iPhone / Safari. The user's goa
 
 What exists (deviations from ARCHITECTURE.md are deliberate):
 - Try-on: custom pointer handling in `canvas/TryOnStage.tsx` (drag, pinch, rotate) + sliders, own alpha-map hit
-  testing (`canvas/gesture.ts`), no Konva Transformer. Closet backdrop = `public/closet.svg` via CSS `.closet-bg`;
+  testing (`canvas/gesture.ts`), no Konva Transformer. Closet backdrop = `public/closet.jpg` via CSS `.closet-bg`;
   `canvas/exportLook.ts` draws it into exported looks.
 - Bg removal: `imaging/bgRemoval.ts`, serialized, consent before the first 80MB download, crash guard.
 - Studio: one generator, 7 presets (`engine/templates.ts`); dress/top is ONE `body` piece; details positioned as
@@ -33,9 +33,13 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
 - AI: `api/ai.js` (Vercel function → fal.ai `fal-ai/nano-banana/edit`, env `FAL_KEY`, `APP_PIN`, optional
   `AI_MODEL`), client in `src/ai/`. Realistic try-on sends a collage + the person photo; text edit in RasterEditor.
   `APP_PIN` must be ≥ 12 chars or the function answers 501.
-- NO EXTRA COSTS (user decision): the paid automatic AI stays optional and off. The ✦ button in try-on opens a
-  sheet whose primary route is free and manual: save the collage + copy a ready prompt → generate in Higgsfield
-  (their existing plan) → Looks → "הוספת תמונה". Do not make paid services a requirement and do not spend credits.
+- NO EXTRA COSTS (user decision): the paid automatic AI stays optional and off; the ✦ button in try-on appears
+  only after activation in Settings. The user rejected a manual "generate it in Higgsfield" route inside the app,
+  so there is none. Realism in the free try-on comes from the photo backdrop and soft shadows (garments, doll,
+  floor) in `canvas/TryOnStage.tsx`. Looks → "הוספת תמונה" imports any picture as a look.
+- Backdrop is a photo, `public/closet.jpg` (generated once with the user's Higgsfield account, with permission to
+  use it for site assets only). The doll's feet sit on its rug: see `L` in TryOnStage if the image changes.
+- Cloud environment `john-dressing-room` allows the Higgsfield image host (d8j0ntlcm91z4.cloudfront.net).
 - NOT verified in the sandbox (hosts blocked): a real @imgly model run and a real fal.ai call. Nothing was run on
   real iOS Safari. Higgsfield plan credits cannot be used from an app (their API bills separately).
 

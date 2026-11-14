@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type WheelEvent } from 'react';
-import { Image as KImage, Layer, Rect, Stage } from 'react-konva';
+import { Ellipse, Image as KImage, Layer, Rect, Stage } from 'react-konva';
 import { getBlob, useBlobUrl } from '../db/blobs';
 import type { BlobRef, Doll, Garment, ID, PlacedItem, Pt } from '../db/types';
 import { ctx2d, decodeToCanvas, releaseCanvas } from '../imaging/load';
@@ -71,6 +71,9 @@ function ItemNode({ item, garment, L }: { item: PlacedItem; garment: Garment; L:
       image={img} x={cx} y={cy} width={garment.w} height={garment.h}
       offsetX={garment.w / 2} offsetY={garment.h / 2}
       scaleX={(w / garment.w) * (item.flipX ? -1 : 1)} scaleY={h / garment.h} rotation={item.rotation}
+      // a soft shadow makes the garment sit on the body instead of floating in front of it
+      shadowColor="#2a1c14" shadowBlur={Math.max(6, L.dh * 0.02)} shadowOpacity={0.3}
+      shadowOffsetX={0} shadowOffsetY={Math.max(2, L.dh * 0.006)}
     />
   );
 }
@@ -89,8 +92,8 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
   const fit = useFit(area, doll.w, doll.h);
   const dollImg = useHtmlImage(doll.cutout);
   // Leave headroom and stand her on the rug of the backdrop instead of filling the whole stage.
-  const dw = fit.width * 0.9, dh = fit.height * 0.9;
-  const L: Layout = { ox: (fit.cw - dw) / 2, oy: fit.ch * 0.955 - dh, dw, dh };
+  const dw = fit.width * 0.84, dh = fit.height * 0.84;
+  const L: Layout = { ox: (fit.cw - dw) / 2, oy: fit.ch * 0.895 - dh, dw, dh };
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.z - b.z), [items]);
   const used = useMemo(
@@ -236,7 +239,20 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
       {fit.cw > 0 && fit.ch > 0 && (
         <Stage ref={stageRef} width={fit.cw} height={fit.ch} listening={false}>
           <Layer listening={false}>
-            {dollImg && <KImage image={dollImg} x={L.ox} y={L.oy} width={L.dw} height={L.dh} />}
+            {dollImg && (
+              <Ellipse
+                x={L.ox + L.dw / 2} y={L.oy + L.dh * 0.985} radiusX={Math.max(L.dw * 0.42, L.dh * 0.11)} radiusY={L.dh * 0.022}
+                fillRadialGradientStartPoint={{ x: 0, y: 0 }} fillRadialGradientEndPoint={{ x: 0, y: 0 }}
+                fillRadialGradientStartRadius={0} fillRadialGradientEndRadius={Math.max(L.dw * 0.42, L.dh * 0.11)}
+                fillRadialGradientColorStops={[0, 'rgba(40,26,18,0.42)', 0.6, 'rgba(40,26,18,0.16)', 1, 'rgba(40,26,18,0)']}
+              />
+            )}
+            {dollImg && (
+              <KImage
+                image={dollImg} x={L.ox} y={L.oy} width={L.dw} height={L.dh}
+                shadowColor="#2a1c14" shadowBlur={Math.max(10, L.dh * 0.03)} shadowOpacity={0.22} shadowOffsetY={Math.max(2, L.dh * 0.006)}
+              />
+            )}
             {sorted.map((it) => {
               const g = garments.get(it.garmentId);
               return g ? <ItemNode key={it.id} item={it} garment={g} L={L} /> : null;

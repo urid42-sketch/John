@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AiGate, aiReady } from '../ai/AiGate';
 import { setAiPin } from '../ai/client';
 import { shareImage } from '../canvas/exportLook';
 import { BackupError, exportBackup, importBackup, lastBackupAt, markBackupDone, type BackupCounts } from '../db/backup';
@@ -17,6 +18,8 @@ export function SettingsScreen() {
   const [last, setLast] = useState<number | null | undefined>(undefined);
   const [busy, setBusy] = useState<{ label: string; ratio: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [gate, setGate] = useState(false);
+  const [aiOn, setAiOn] = useState(aiReady);
   const [file, setFile] = useState<{ blob: Blob; name: string; counts: BackupCounts } | null>(null);
   const refresh = () => {
     void requestPersist().then(storageInfo).then(setInfo);
@@ -109,11 +112,19 @@ export function SettingsScreen() {
 
         <section className="space-y-2 rounded-3xl border border-line bg-paper p-5">
           <h2 className="font-serif text-lg">{he.ai.settingsTitle}</h2>
-          <p className="text-sm leading-relaxed text-muted">{he.ai.consentBody}</p>
-          <button className="min-h-11 text-sm text-rose-deep underline" onClick={() => { setAiPin(null); toast(he.ai.pinReset); }}>{he.ai.resetPin}</button>
+          <p className="text-sm leading-relaxed text-muted">{he.ai.optional}</p>
+          {aiOn ? (
+            <>
+              <p className="text-sm text-rose-deep">{he.ai.active}</p>
+              <button className="min-h-11 text-sm text-rose-deep underline" onClick={() => { setAiPin(null); setAiOn(false); toast(he.ai.pinReset); }}>{he.ai.resetPin}</button>
+            </>
+          ) : (
+            <button className="btn btn-ghost w-full" onClick={() => setGate(true)}>{he.ai.activate}</button>
+          )}
         </section>
         <p className="text-center text-xs text-muted">{he.welcome.privacy}</p>
       </div>
+      {gate && <AiGate onClose={() => setGate(false)} onReady={() => { setGate(false); setAiOn(true); toast(he.ai.activated); }} />}
     </Page>
   );
 }
