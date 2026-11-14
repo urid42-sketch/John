@@ -39,9 +39,13 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   floor) in `canvas/TryOnStage.tsx`. Looks → "הוספת תמונה" imports any picture as a look.
 - Backdrop is a photo, `public/closet.jpg` (generated once with the user's Higgsfield account, with permission to
   use it for site assets only). The doll's feet sit on its rug: see `L` in TryOnStage if the image changes.
-- Cloud environment `john-dressing-room` allows the Higgsfield image host (d8j0ntlcm91z4.cloudfront.net).
-- NOT verified in the sandbox (hosts blocked): a real @imgly model run and a real fal.ai call. Nothing was run on
-  real iOS Safari. Higgsfield plan credits cannot be used from an app (their API bills separately).
+- Cloud environment `john-dressing-room` allows d8j0ntlcm91z4.cloudfront.net (Higgsfield images) and
+  staticimgly.com (bg-removal model), so both can be used in browser checks here.
+- Verified in Chromium with real photos: the @imgly model run (about 20s per image, clean cutouts) and the
+  whole photo → cutout → try-on path. NOT verified: a real fal.ai call (no key) and anything on real iOS Safari.
+- The user asked for a 3D doll and finer garment detail after seeing the SCHEMATIC test figure. With a real photo
+  and a real garment photo the result is photographic; a true 3D avatar with fitted 3D clothes is a different
+  product (no way to turn imported garment photos into fitted 3D clothing for free) and was not started. Higgsfield plan credits cannot be used from an app (their API bills separately).
 
 ## Stack
 React 19 + Vite 8 + TypeScript 7, Tailwind v4 · Konva/react-konva · Dexie (IndexedDB) ·

@@ -240,11 +240,13 @@ export function TryOnStage({ doll, items, garments, selectedId, onSelect, onChan
         <Stage ref={stageRef} width={fit.cw} height={fit.ch} listening={false}>
           <Layer listening={false}>
             {dollImg && (
+              // contact shadow on the floor: a round gradient squashed flat (Konva does not squash gradients itself)
               <Ellipse
-                x={L.ox + L.dw / 2} y={L.oy + L.dh * 0.985} radiusX={Math.max(L.dw * 0.42, L.dh * 0.11)} radiusY={L.dh * 0.022}
+                x={L.ox + L.dw / 2} y={L.oy + L.dh * 0.975} scaleY={0.16}
+                radiusX={Math.max(L.dw * 0.5, L.dh * 0.13)} radiusY={Math.max(L.dw * 0.5, L.dh * 0.13)}
                 fillRadialGradientStartPoint={{ x: 0, y: 0 }} fillRadialGradientEndPoint={{ x: 0, y: 0 }}
-                fillRadialGradientStartRadius={0} fillRadialGradientEndRadius={Math.max(L.dw * 0.42, L.dh * 0.11)}
-                fillRadialGradientColorStops={[0, 'rgba(40,26,18,0.42)', 0.6, 'rgba(40,26,18,0.16)', 1, 'rgba(40,26,18,0)']}
+                fillRadialGradientStartRadius={0} fillRadialGradientEndRadius={Math.max(L.dw * 0.5, L.dh * 0.13)}
+                fillRadialGradientColorStops={[0, 'rgba(40,26,18,0.38)', 0.55, 'rgba(40,26,18,0.14)', 1, 'rgba(40,26,18,0)']}
               />
             )}
             {dollImg && (
