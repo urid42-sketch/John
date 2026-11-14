@@ -19,13 +19,15 @@ export function BottomNav() {
               to={t.to}
               end={t.to === '/'}
               className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs ${
-                  isActive ? 'text-rose-deep font-medium' : 'text-muted'
-                }`
+                `flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs ${isActive ? 'font-medium text-rose-deep' : 'text-muted'}`
               }
             >
-              {t.icon}
-              <span>{t.label}</span>
+              {({ isActive }) => (
+                <>
+                  <span className={`flex h-8 w-14 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-rose-soft' : ''}`}>{t.icon}</span>
+                  <span>{t.label}</span>
+                </>
+              )}
             </NavLink>
           </li>
         ))}

@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { saveDesign } from '../db/repo';
 import { db } from '../db/schema';
-import type { GarmentVersion, ID } from '../db/types';
+import { addToDraftFitted } from '../canvas/autoPlace';
+import type { Garment, GarmentVersion, ID } from '../db/types';
 import { fromTemplate, migrateDesign, normalizeDesign, TEMPLATE_IDS } from '../engine/templates';
 import type { GarmentDesign, TemplateId } from '../engine/types';
 import { he } from '../i18n/he';
@@ -30,7 +31,8 @@ export function StudioEditor() {
   const [ready, setReady] = useState(!id);
   const [tab, setTab] = useState<Tab>('cut');
   const [selDetail, setSelDetail] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<'save' | 'versions' | null>(null);
+  const [sheet, setSheet] = useState<'save' | 'versions' | 'saved' | null>(null);
+  const lastSaved = useRef<Garment | null>(null);
   const [saving, setSaving] = useState(false);
   const savedDesign = useRef<GarmentDesign | null>(null);
   const [, bumpSaved] = useState(0);
@@ -73,8 +75,8 @@ export function StudioEditor() {
       setName(g.name);
       savedDesign.current = design;
       bumpSaved((n) => n + 1);
-      setSheet(null);
-      toast(asCopy ? t.copySaved : t.saved);
+      lastSaved.current = g;
+      setSheet('saved');
     } catch (e) {
       console.error(e);
       toastError(errorText(e, he.errors.saveFailed));
@@ -126,12 +128,22 @@ export function StudioEditor() {
 
       {sheet && (
         <div className="absolute inset-0 z-30 flex flex-col justify-end bg-ink/30" onClick={() => !saving && setSheet(null)}>
-          <div className="safe-b mx-auto max-h-[80%] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-paper p-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={sheet === 'save' ? t.saveTitle : t.versionsTitle}>
+          <div className="safe-b mx-auto max-h-[80%] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-paper p-4" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={sheet === 'save' ? t.saveTitle : sheet === 'saved' ? t.savedTitle : t.versionsTitle}>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-serif text-lg">{sheet === 'save' ? t.saveTitle : t.versionsTitle}</h2>
+              <h2 className="font-serif text-lg">{sheet === 'save' ? t.saveTitle : sheet === 'saved' ? t.savedTitle : t.versionsTitle}</h2>
               <button className="flex h-11 w-11 items-center justify-center" onClick={() => setSheet(null)} disabled={saving} aria-label={he.common.close}><IconClose /></button>
             </div>
-            {sheet === 'save' ? (
+            {sheet === 'saved' ? (
+              <div className="space-y-3">
+                <button
+                  className="btn btn-primary w-full"
+                  onClick={() => { const g = lastSaved.current; if (g) addToDraftFitted(g).then(() => nav('/')).catch((e) => toastError(errorText(e))); }}
+                >
+                  {t.tryNow}
+                </button>
+                <button className="btn btn-ghost w-full" onClick={() => setSheet(null)}>{t.keepDesigning}</button>
+              </div>
+            ) : sheet === 'save' ? (
               <div className="space-y-3">
                 <input
                   type="text" value={name} maxLength={60} placeholder={t.namePlaceholder} onChange={(e) => setName(e.target.value)}

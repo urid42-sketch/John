@@ -81,7 +81,7 @@ export function ImportFlow() {
         const g = await addGarment({ ...meta, name }, cut, origin.current);
         void requestPersist();
         toast(he.garment.added);
-        nav(`/wardrobe?cat=${g.category}`, { replace: true });
+        nav(`/garment/${g.id}`, { replace: true });
       }
     } catch (e) {
       console.error(e);

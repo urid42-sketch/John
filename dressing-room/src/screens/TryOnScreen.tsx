@@ -10,6 +10,7 @@ import { getBlob } from '../db/blobs';
 import { normalizeDeg } from '../canvas/gesture';
 import { TryOnStage } from '../canvas/TryOnStage';
 import { addLook, getDraft, saveDraft } from '../db/repo';
+import { addMannequinDoll, addStarterWardrobe } from '../db/starter';
 import { db } from '../db/schema';
 import { CATEGORIES, DRAFT_LOOK_ID, type Category, type Garment, type ID, type PlacedItem } from '../db/types';
 import { he } from '../i18n/he';
@@ -19,6 +20,20 @@ import { Thumb } from '../ui/Thumb';
 import { toast, toastError } from '../ui/toast';
 
 function Welcome() {
+  const [busy, setBusy] = useState(false);
+  const quick = async () => {
+    setBusy(true);
+    try { await addMannequinDoll(); await addStarterWardrobe(); }
+    catch (e) { console.error(e); toastError(errorText(e)); setBusy(false); }
+  };
+  if (busy) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center" role="status">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-rose-soft border-t-rose" />
+        <p>{he.starter.preparing}</p>
+      </div>
+    );
+  }
   return (
     <div className="flex h-full flex-col items-center justify-center gap-5 overflow-y-auto p-8 text-center">
       <h2 className="font-serif text-3xl">{he.welcome.title}</h2>
@@ -30,6 +45,11 @@ function Welcome() {
         </ul>
       </div>
       <Link to="/import/doll" className="btn btn-primary w-full max-w-xs">{he.welcome.addPhoto}</Link>
+      <div className="w-full max-w-xs space-y-2">
+        <p className="text-xs text-muted">{he.starter.or}</p>
+        <button className="btn btn-ghost w-full" onClick={() => void quick()}>{he.starter.quick}</button>
+        <p className="text-xs leading-relaxed text-muted">{he.starter.quickHint}</p>
+      </div>
       <p className="max-w-xs text-xs text-muted">{he.welcome.privacy}</p>
     </div>
   );
@@ -246,6 +266,16 @@ export function TryOnScreen() {
                 <Thumb blob={d.thumb} alt="" />
               </button>
             ))}
+          </div>
+        )}
+        {items.length === 0 && !drawer && (
+          <div className="absolute inset-x-4 bottom-4 space-y-2 rounded-3xl bg-paper/95 p-4 text-center shadow-lg">
+            <p className="font-serif text-lg">{he.guide.nextTitle}</p>
+            <button className="btn btn-primary w-full" onClick={() => setDrawer(true)}>{he.guide.fromWardrobe}</button>
+            <div className="flex gap-2">
+              <Link to="/import/garment" className="btn btn-ghost flex-1 !px-2 text-sm">{he.guide.importOne}</Link>
+              <Link to="/studio" className="btn btn-ghost flex-1 !px-2 text-sm">{he.guide.designOne}</Link>
+            </div>
           </div>
         )}
         {items.length > 0 && !sel && (

@@ -8,8 +8,8 @@ Mobile-first, Hebrew RTL, single user, no login, everything local in IndexedDB.
 project — do not read or modify them.
 
 ## Current stage
-**All stages (0-5) are built.** Waiting for: the user's Vercel deploy (see `dressing-room/DEPLOY.md`), a test on
-Aya's iPhone, and — for the realistic try-on — `FAL_KEY` + `APP_PIN` in Vercel env.
+**All stages (0-5) are built and LIVE** at https://john-dressing-room.vercel.app (Vercel project `john-dressing-room`,
+auto-deploys from this branch; `FAL_KEY` + `APP_PIN` are set there). Waiting for: a test on Aya's iPhone and fal credits.
 The user asked for the app to be finished autonomously, without stopping for approvals; keep them updated.
 
 User: Aya (name is `USER_NAME` in `i18n/he.ts`), iPhone / Safari. The user's goal is a REALISTIC result.
@@ -19,12 +19,19 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   testing (`canvas/gesture.ts`), no Konva Transformer. Closet backdrop = `public/closet.jpg` via CSS `.closet-bg`;
   `canvas/exportLook.ts` draws it into exported looks.
 - Bg removal: `imaging/bgRemoval.ts`, serialized, consent before the first 80MB download, crash guard.
+- EASE OF USE (user asked: "not understandable", make it friendlier and more professional): instant start without a
+  photo (`db/starter.ts`: shop-mannequin doll + five sample garments made by the studio engine), a "what next" card on
+  an empty try-on stage, `/help` screen (`screens/HelpScreen.tsx`, texts in `he.guide`), after saving a design a sheet
+  offers "try it on now", after importing a garment you land on its page. Principle: every empty screen points to the
+  next action; keep adding guidance in this spirit.
+- `engine/mannequin.ts` = glossy ivory shop mannequin, parts lit separately (arms, legs, torso over the joints, egg
+  head). Used in the studio preview without a doll, on the template cards and as the starter doll.
 - STUDIO RENDERING (v2, per-pixel): `engine/shade.ts` builds a height field per garment piece (row-cylinder roundness,
   bust bumps, fold ridges, radial pleats from the waist = `Piece.drape`) and lights it with a key light (satin sheen,
   velvet rim, lace over a slip); prints are bent along the folds. `engine/render.ts` draws each piece through it, then
   seams / hem stitching / details. Fabric tiles (`fabricTiles.ts`) are flat colour+weave only and are mip-mapped
   (`fabricTileFor`) to avoid moiré. `fabricPresets.ts` = 18 one-tap cloths (names in `he.studio.presets`);
-  `mannequin.ts` = lit dress form used when no doll exists and on the studio home cards. Pure parts are unit-tested.
+  Pure parts are unit-tested.
   Known gaps: detail shapes (bow, belt, buttons, embroidery) are still flat 2D drawings; pants hip area is boxy.
 - Studio: one generator, 7 presets (`engine/templates.ts`); dress/top is ONE `body` piece; details positioned as
   fractions of the garment box; `studio/useHistory.ts` (no Zustand). Designs are rendered once on the canonical

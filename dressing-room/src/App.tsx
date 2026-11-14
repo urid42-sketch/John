@@ -11,11 +11,12 @@ import { StudioHome } from './studio/StudioHome';
 import { GarmentScreen } from './screens/GarmentScreen';
 import { RasterEditor } from './screens/RasterEditor';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { HelpScreen } from './screens/HelpScreen';
 import { LooksScreen } from './screens/LooksScreen';
 import { TryOnScreen } from './screens/TryOnScreen';
 import { WardrobeScreen } from './screens/WardrobeScreen';
 import { BottomNav } from './ui/BottomNav';
-import { IconGear } from './ui/icons';
+import { IconGear, IconHelp } from './ui/icons';
 import { toast, ToastHost } from './ui/toast';
 
 function Shell() {
@@ -23,9 +24,10 @@ function Shell() {
     <div className="mx-auto flex h-full max-w-xl flex-col">
       <header className="safe-t flex items-center justify-between px-4 pb-1 pt-2">
         <h1 className="font-serif text-2xl tracking-wide">{he.appName}</h1>
-        <Link to="/settings" aria-label={he.settings.title} className="flex h-12 w-12 items-center justify-center text-muted">
-          <IconGear />
-        </Link>
+        <div className="flex">
+          <Link to="/help" aria-label={he.guide.help} className="flex h-12 w-11 items-center justify-center text-muted"><IconHelp /></Link>
+          <Link to="/settings" aria-label={he.settings.title} className="flex h-12 w-11 items-center justify-center text-muted"><IconGear /></Link>
+        </div>
       </header>
       <main className="relative min-h-0 flex-1">
         <Outlet />
@@ -41,8 +43,9 @@ export function App() {
     db.open()
       .then(async () => {
         // Gentle nudge: plenty of content and no backup for two weeks.
-        const [last, count] = await Promise.all([lastBackupAt(), db.garments.count()]);
-        if (count >= 5 && (!last || Date.now() - last > 14 * 86400_000)) toast(he.backup.reminder);
+        const [last, count, oldest] = await Promise.all([lastBackupAt(), db.garments.count(), db.garments.orderBy('updatedAt').first()]);
+        const since = last ?? oldest?.createdAt ?? Date.now(); // a brand-new wardrobe needs no nagging
+        if (count >= 5 && Date.now() - since > 14 * 86400_000) toast(he.backup.reminder);
       })
       .catch((e) => { console.error(e); setDbError(true); });
   }, []);
@@ -73,6 +76,7 @@ export function App() {
         <Route path="dolls" element={<DollsScreen />} />
         <Route path="dolls/:id/calibrate" element={<DollCalibrate />} />
         <Route path="settings" element={<SettingsScreen />} />
+        <Route path="help" element={<HelpScreen />} />
         <Route path="*" element={<Shell />} />
       </Routes>
     </>
