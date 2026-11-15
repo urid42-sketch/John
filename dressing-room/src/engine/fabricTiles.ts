@@ -16,6 +16,46 @@ export function registerFabricImage(blobId: string, canvas: HTMLCanvasElement) {
 }
 export const hasFabricImage = (blobId: string) => images.has(blobId);
 
+// Photographed cloth detail (grey, mean 128) laid over the procedural colour with an "overlay"
+// blend: it adds real fibres and weave without changing the colour the user picked.
+const details = new Map<string, HTMLCanvasElement>();
+const DETAIL_OF: Partial<Record<Fabric['kind'], [name: string, strength: number, repeat: number]>> = {
+  satin: ['satin', 0.55, 1], velvet: ['velvet', 0.9, 1], denim: ['denim', 0.95, 2], linen: ['linen', 0.9, 2],
+  solid: ['linen', 0.4, 3], floral: ['satin', 0.35, 1], plaid: ['linen', 0.5, 2],
+};
+export const BUILTIN_PRINTS = ['peony', 'ditsy', 'botanical'] as const;
+export const fabricDetail = (kind: Fabric['kind']) => { const d = DETAIL_OF[kind]; return d ? details.get(d[0]) : undefined; };
+export const assetCanvas = (name: string) => details.get(name);
+
+function loadCanvas(url: string): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d')!.drawImage(img, 0, 0);
+      resolve(c);
+    };
+    img.onerror = () => reject(new Error(`texture ${url}`));
+    img.src = url;
+  });
+}
+
+let assets: Promise<void> | null = null;
+/** Load the photographed textures once. Fabrics still work (plain procedural) if this fails. */
+export function loadFabricAssets(): Promise<void> {
+  assets ??= (async () => {
+    const got = await Promise.allSettled([
+      ...['velvet', 'satin', 'denim', 'linen', 'wood'].map(async (n) => { details.set(n, await loadCanvas(`/tex/${n}.jpg`)); }),
+      ...BUILTIN_PRINTS.map(async (n) => { images.set(`builtin:${n}`, await loadCanvas(`/tex/print-${n}.jpg`)); }),
+    ]);
+    if (got.some((r) => r.status === 'rejected')) assets = null; // allow a retry later (offline first run)
+    for (const c of cache.values()) c.width = 0;
+    cache.clear(); dataCache.clear(); mips.clear();
+  })();
+  return assets;
+}
+
 export function shade(hex: string, k: number): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return hex;
@@ -61,7 +101,9 @@ function draw(f: Fabric, c: HTMLCanvasElement) {
     case 'image': {
       const img = f.image ? images.get(f.image) : undefined;
       if (!img) { fill(base); break; }
-      const S = c.width, h = S / 2; // mirrored 2×2 so any photo tiles without a visible seam
+      const S = c.width, h = S / 2;
+      if (f.image?.startsWith('builtin:')) { ctx.drawImage(img, 0, 0, S, S); break; } // made to repeat: no mirroring
+      // a user photo is mirrored 2×2 so it tiles without a visible seam
       for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
         ctx.save();
         ctx.translate(sx ? S : 0, sy ? S : 0);
@@ -93,15 +135,14 @@ function draw(f: Fabric, c: HTMLCanvasElement) {
     }
     case 'denim': {
       fill(base);
-      ctx.lineWidth = 1.6;
-      for (let i = -SIZE; i < SIZE * 2; i += 3) { // twill diagonal
-        ctx.strokeStyle = (i / 3) % 3 === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,40,0.17)';
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i - SIZE, SIZE); ctx.stroke();
+      if (!details.has('denim')) { // drawn twill only until the photographed weave is loaded
+        ctx.lineWidth = 1.6;
+        for (let i = -SIZE; i < SIZE * 2; i += 3) {
+          ctx.strokeStyle = (i / 3) % 3 === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,40,0.17)';
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i - SIZE, SIZE); ctx.stroke();
+        }
       }
-      for (let i = 0; i < 700; i++) { // lighter yarn flecks
-        ctx.fillStyle = `rgba(225,235,255,${0.1 + rand() * 0.18})`;
-        wrapped(SIZE, rand() * SIZE, rand() * SIZE, 4, (x, y) => ctx.fillRect(x, y, 1.5, 2 + rand() * 4));
-      }
+      grain(ctx, rand, 500, 0.04);
       break;
     }
     case 'lace': {
@@ -180,6 +221,15 @@ function draw(f: Fabric, c: HTMLCanvasElement) {
       fill(base);
       weave(ctx, 4, 0.035);
       grain(ctx, rand, 1200, 0.03);
+  }
+  const det = DETAIL_OF[f.kind], photo = det && details.get(det[0]);
+  if (det && photo) {
+    const [, strength, repeat] = det, s = SIZE / repeat;
+    ctx.save();
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = strength;
+    for (let y = 0; y < repeat; y++) for (let x = 0; x < repeat; x++) ctx.drawImage(photo, x * s, y * s, s, s);
+    ctx.restore();
   }
 }
 

@@ -27,7 +27,7 @@ const PRESETS: Record<TemplateId, Partial<GarmentDesign>> = {
 
 /** The cloth each pattern is first shown in: chosen so every starting point looks good. */
 export const TEMPLATE_CLOTH: Record<TemplateId, string> = {
-  aline: 'floralPink', bodycon: 'velvetWine', mermaid: 'satinEmerald', maxi: 'satinChampagne', skirt: 'plaidRed', top: 'linenWhite', pants: 'denimDark',
+  aline: 'printPeony', bodycon: 'velvetWine', mermaid: 'satinEmerald', maxi: 'satinChampagne', skirt: 'plaidRed', top: 'linenWhite', pants: 'denimDark',
 };
 
 export function fromTemplate(t: TemplateId): GarmentDesign {

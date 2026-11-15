@@ -10,6 +10,7 @@ import { fromTemplate, TEMPLATE_IDS } from '../engine/templates';
 import type { TemplateId } from '../engine/types';
 import { he } from '../i18n/he';
 import { Thumb } from '../ui/Thumb';
+import { ensureFabricImage } from './renderDesign';
 
 const CARD_SCALE = 0.5; // garment units → card canvas px (kept small: seven cards render at once)
 let figure: HTMLCanvasElement | null = null;
@@ -23,16 +24,21 @@ function TemplateCard({ id }: { id: TemplateId }) {
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
+    let alive = true;
     const d = fromTemplate(id);
     d.seed = 5;
-    const g = generate(d, CANONICAL);
-    const fig = sharedFigure();
-    c.width = fig.width; c.height = fig.height;
-    const ctx = c.getContext('2d')!;
-    ctx.drawImage(fig, 0, 0);
-    const garment = renderGarment(g, d, CARD_SCALE);
-    ctx.drawImage(garment, g.bbox.x * CARD_SCALE, g.bbox.y * CARD_SCALE);
-    garment.width = 0;
+    void ensureFabricImage(d.fabric).catch(() => undefined).then(() => {
+      if (!alive) return;
+      const g = generate(d, CANONICAL);
+      const fig = sharedFigure();
+      c.width = fig.width; c.height = fig.height;
+      const ctx = c.getContext('2d')!;
+      ctx.drawImage(fig, 0, 0);
+      const garment = renderGarment(g, d, CARD_SCALE);
+      ctx.drawImage(garment, g.bbox.x * CARD_SCALE, g.bbox.y * CARD_SCALE);
+      garment.width = 0;
+    });
+    return () => { alive = false; };
   }, [id]);
   return (
     <Link

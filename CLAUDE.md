@@ -31,6 +31,12 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   tiles, OrbitControls, render on demand. The studio editor shows it by default with a "תלת־ממד / על הדמות" toggle;
   saving still uses the 2D render (wardrobe, try-on). In 3D only belt, buttons and bow details are shown; sleeves are
   simple caps / hanging tubes; no cloth simulation. Imported photo garments stay 2D by nature.
+- PHOTOGRAPHED TEXTURES (`public/tex/*.jpg`, made with the user's Higgsfield account, ~2 credits, approved):
+  grey weave detail maps (velvet, satin, denim, linen; mean 128, seamless) overlaid on the procedural colour in
+  `fabricTiles.ts` so any colour keeps real fibres, also used as bump maps in 3D; `wood.jpg` for the stand; three
+  ready prints (`builtin:peony|ditsy|botanical`, fabric kind `image`, presets `printPeony` etc.). Loaded once by
+  `loadFabricAssets()` (awaited inside `ensureFabricImage`); fabrics fall back to procedural if loading fails.
+  The user approved about 5 Higgsfield credits for raising quality; ask again before spending beyond that.
 - `engine/mannequin.ts` = glossy ivory shop mannequin, parts lit separately (arms, legs, torso over the joints, egg
   head). Used in the studio preview without a doll, on the template cards and as the starter doll.
 - STUDIO RENDERING (v2, per-pixel): `engine/shade.ts` builds a height field per garment piece (row-cylinder roundness,
@@ -63,7 +69,7 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   rest against the body), saved as the doll's calibration on import. `fitGarment` scales an imported garment so its
   own waist lands on her waist, centres it, and returns a per-row widening profile (`PlacedItem.fit`) drawn by
   `TryOnStage` from a row-warped copy. Runs on every add; "התאמה אוטומטית לגוף" in the tune panel re-runs it.
-- Do NOT spend Higgsfield credits without the user's explicit approval (37 left on 2026-11-14).
+- Do NOT spend Higgsfield credits without the user's explicit approval (about 35 left on 2026-11-15).
 - The user is willing to load about $5 once on fal.ai for the automatic realistic try-on (see DEPLOY.md part ג׳).
 - Backdrop is a photo, `public/closet.jpg` (generated once with the user's Higgsfield account, with permission to
   use it for site assets only). The doll's feet sit on its rug: see `L` in TryOnStage if the image changes.

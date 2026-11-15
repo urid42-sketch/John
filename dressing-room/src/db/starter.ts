@@ -25,7 +25,7 @@ export async function addMannequinDoll(): Promise<Doll> {
 }
 
 const SAMPLES: [TemplateId, string, keyof typeof he.starter.samples][] = [
-  ['aline', 'floralPink', 'dress'], ['mermaid', 'satinEmerald', 'gown'], ['top', 'linenWhite', 'top'],
+  ['aline', 'printPeony', 'dress'], ['mermaid', 'satinEmerald', 'gown'], ['top', 'linenWhite', 'top'],
   ['skirt', 'plaidRed', 'skirt'], ['pants', 'denimDark', 'pants'],
 ];
 

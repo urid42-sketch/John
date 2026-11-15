@@ -87,7 +87,7 @@ export function FabricPanel({ d, set }: { d: GarmentDesign; set: Set }) {
       <Field label={t.ready}>
         <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
           {FABRIC_PRESETS.map((p) => {
-            const on = p.fabric.kind === f.kind && p.fabric.colors[0].toLowerCase() === f.colors[0].toLowerCase();
+            const on = p.fabric.kind === f.kind && (f.kind === 'image' ? p.fabric.image === f.image : p.fabric.colors[0].toLowerCase() === f.colors[0].toLowerCase());
             return (
               <button
                 key={p.id} type="button" aria-pressed={on} onClick={() => set({ ...d, fabric: { ...p.fabric, colors: [...p.fabric.colors] } })}

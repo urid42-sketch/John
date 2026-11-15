@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { fabricTile } from '../engine/fabricTiles';
+import { assetCanvas, fabricDetail, fabricTile, loadFabricAssets } from '../engine/fabricTiles';
 import type { Fabric, GarmentDesign } from '../engine/types';
 import { he } from '../i18n/he';
 import { ensureFabricImage } from '../studio/renderDesign';
@@ -70,6 +70,19 @@ function buildForm(): THREE.Group {
     color: '#a8632c', roughness: 1, sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color('#f2c48f'),
     bumpMap: noiseTexture(256, 0.5), bumpScale: 0.6,
   });
+  const pile = assetCanvas('velvet');
+  if (pile) { // real velvet: caramel colour with the photographed pile laid over it, and its relief
+    const c = document.createElement('canvas');
+    c.width = c.height = 512;
+    const x = c.getContext('2d')!;
+    x.fillStyle = '#b06a2f'; x.fillRect(0, 0, 512, 512);
+    x.globalCompositeOperation = 'overlay'; x.drawImage(pile, 0, 0, 512, 512);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const bump = new THREE.CanvasTexture(pile);
+    for (const t of [map, bump]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.2, 1.2); t.anisotropy = 4; }
+    velvet.color.set('#ffffff'); velvet.map = map; velvet.bumpMap = bump; velvet.bumpScale = 1.4;
+  }
   const torso = new THREE.Mesh(loft(pos, (i, j) => [j / cols * 3, i / rows * 3]), velvet);
   torso.castShadow = true;
   g.add(torso);
@@ -82,6 +95,8 @@ function buildForm(): THREE.Group {
   const metal = new THREE.MeshStandardMaterial({ color: '#b8b8b8', metalness: 1, roughness: 0.3 });
   const dark = new THREE.MeshStandardMaterial({ color: '#1c1a1a', metalness: 0.6, roughness: 0.45 });
   const wood = new THREE.MeshStandardMaterial({ color: '#5b2c1b', roughness: 0.42 });
+  const grainC = assetCanvas('wood');
+  if (grainC) { const t = new THREE.CanvasTexture(grainC); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; wood.color.set('#b98f7c'); wood.map = t; }
   const rod = (y0: number, y1: number, r: number, m: THREE.Material) => {
     const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, (y1 - y0) * S, 24), m);
     mesh.position.copy(V(0, (y0 + y1) / 2, 0));
@@ -116,9 +131,15 @@ function clothMaterial(f: Fabric): THREE.MeshPhysicalMaterial {
   const base = f.colors[0];
   const m = new THREE.MeshPhysicalMaterial({ map, side: THREE.DoubleSide, roughness: 0.85, sheen: 0.3, sheenRoughness: 0.6, sheenColor: tint(base, 0.5) });
   if (f.kind === 'satin') { m.roughness = 0.58 - 0.22 * f.sheen; m.sheen = 0.7; m.sheenRoughness = 0.25; m.sheenColor = tint(base, 0.7); }
-  if (f.kind === 'velvet') { m.roughness = 1; m.sheen = 1; m.sheenRoughness = 0.4; m.sheenColor = tint(base, 0.55); }
+  if (f.kind === 'velvet') { m.roughness = 1; m.sheen = 0.55; m.sheenRoughness = 0.5; m.sheenColor = tint(base, 0.3); }
   if (f.kind === 'denim' || f.kind === 'linen') { m.roughness = 0.95; m.sheen = 0.1; }
   if (f.kind === 'lace') { m.transparent = true; m.alphaTest = 0.08; }
+  const weave = fabricDetail(f.kind);
+  if (weave && f.sequins <= 0.05) { // the threads catch the light
+    const b = new THREE.CanvasTexture(weave);
+    b.wrapS = b.wrapT = THREE.RepeatWrapping;
+    m.bumpMap = b; m.bumpScale = f.kind === 'satin' ? 0.35 : 0.9;
+  }
   if (f.sequins > 0.05) { m.roughness = Math.max(0.12, m.roughness - 0.5 * f.sequins); m.metalness = 0.55 * f.sequins; m.bumpMap = noiseTexture(128, 1); m.bumpScale = 1.5; (m.bumpMap as THREE.Texture).repeat.set(24, 24); }
   return m;
 }
@@ -147,7 +168,7 @@ function buildGarment(d: GarmentDesign): THREE.Group {
   const f = d.fabric, tileWorld = 256 * 0.55 * f.scale; // body units covered by one fabric tile
   const mat = clothMaterial(f);
   let shell = garmentShell(d);
-  const crotchY = 552;
+  const crotchY = 574; // past the underside of the form, so nothing of it shows between the legs
   if (d.type === 'pants') { // upper part as a tube, then two legs
     const keep = shell.pos.filter((row) => row[0].y <= crotchY);
     shell = { ...shell, pos: keep, rows: keep.length - 1, yHem: keep[keep.length - 1][0].y };
@@ -289,7 +310,8 @@ export default function Viewer({ design, onUnavailable }: { design: GarmentDesig
     floor.rotation.x = -Math.PI / 2;
     floor.position.copy(V(0, FLOOR_Y, 0));
     floor.receiveShadow = true;
-    scene.add(floor, buildForm());
+    scene.add(floor);
+    void loadFabricAssets().catch(() => undefined).then(() => { if (alive) { scene.add(buildForm()); render(); } });
 
     const camera = new THREE.PerspectiveCamera(27, 1, 0.1, 100);
     camera.position.set(6.6, 0.9, 20.5);

@@ -12,7 +12,8 @@ function serviceWorker(): Plugin {
       const assets = Object.values(bundle)
         .filter((f) => !f.fileName.endsWith('.wasm') && !f.fileName.endsWith('.map') && !/(^|\/)ort[.-]/.test(f.fileName) && !(f.type === 'chunk' && f.code.length > 600_000 && !f.isEntry))
         .map((f) => `/${f.fileName}`);
-      const list = ['/', '/index.html', '/manifest.webmanifest', '/closet.jpg', '/icons/icon-192.png', ...assets];
+      const list = ['/', '/index.html', '/manifest.webmanifest', '/closet.jpg', '/icons/icon-192.png',
+        ...['velvet', 'satin', 'denim', 'linen', 'wood', 'print-peony', 'print-ditsy', 'print-botanical'].map((n) => `/tex/${n}.jpg`), ...assets];
       const source = readFileSync(new URL('./src/sw.template.js', import.meta.url), 'utf8')
         .replace('__VERSION__', Date.now().toString(36))
         .replace('__ASSETS__', JSON.stringify([...new Set(list)]));

@@ -131,6 +131,7 @@ export const he = {
     fabricKind: 'אריג', fabrics: { solid: 'כותנה', satin: 'סאטן', velvet: 'קטיפה', linen: 'פשתן', lace: 'תחרה', denim: 'ג׳ינס', floral: 'פרחוני', plaid: 'משבצות', image: 'תמונה שלי' },
     ready: 'בדים מוכנים', custom: 'התאמה אישית',
     presets: {
+      printPeony: 'ורדים בצבעי מים', printDitsy: 'פרחים קטנים על כחול', printBotanical: 'עלים ירוקים',
       satinRed: 'סאטן אדום', satinEmerald: 'סאטן ירוק', satinChampagne: 'סאטן שמפניה', satinBlush: 'סאטן ורוד',
       velvetWine: 'קטיפה בורדו', velvetNavy: 'קטיפה כחולה', laceIvory: 'תחרה שנהב', laceBlack: 'תחרה שחורה',
       floralPink: 'פרחוני ורוד', floralNavy: 'פרחוני כחול', denimBlue: 'ג׳ינס כחול', denimDark: 'ג׳ינס כהה',

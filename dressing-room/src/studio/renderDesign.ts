@@ -2,7 +2,7 @@ import { getBlob, makeStoredBlob } from '../db/blobs';
 import type { DesignRender } from '../db/repo';
 import { db } from '../db/schema';
 import { CANONICAL } from '../engine/body';
-import { hasFabricImage, registerFabricImage } from '../engine/fabricTiles';
+import { hasFabricImage, loadFabricAssets, registerFabricImage } from '../engine/fabricTiles';
 import { generate } from '../engine/generate';
 import { renderGarment } from '../engine/render';
 import type { Fabric, GarmentDesign } from '../engine/types';
@@ -12,7 +12,8 @@ const FABRIC_OWNER = 'fabric-images';
 
 /** Make sure an uploaded fabric image is decoded and known to the tile renderer. */
 export async function ensureFabricImage(f: Fabric): Promise<void> {
-  if (f.kind !== 'image' || !f.image || hasFabricImage(f.image)) return;
+  await loadFabricAssets().catch(() => undefined); // photographed weave + built-in prints
+  if (f.kind !== 'image' || !f.image || hasFabricImage(f.image) || f.image.startsWith('builtin:')) return;
   const blob = await getBlob(f.image);
   if (blob) registerFabricImage(f.image, await decodeToCanvas(blob, 512));
 }
