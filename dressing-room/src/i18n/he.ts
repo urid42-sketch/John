@@ -100,6 +100,7 @@ export const he = {
     emptyCutout: 'לא נשאר כלום מהתמונה. שחזרי חלק עם המברשת.',
   },
   tryon: {
+    changeDoll: 'החלפת דמות', addMyPhoto: `📷 לשים תמונה של ${USER_NAME}`,
     openWardrobe: 'בגדים', emptyWardrobe: 'עדיין אין בגדים בארון', toWardrobe: 'לארון',
     forward: 'קדימה', backward: 'אחורה', flip: 'היפוך', duplicate: 'שכפול', remove: 'הסרה',
     tune: 'כוונון', refit: 'התאמה אוטומטית לגוף', size: 'גודל', rotate: 'סיבוב', width: 'רוחב', clear: 'ניקוי הכול', clearConfirm: 'להסיר את כל הבגדים מהדמות?',

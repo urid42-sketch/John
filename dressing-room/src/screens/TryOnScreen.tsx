@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useNavigate } from 'react-router-dom';
 import { AiGate, aiReady } from '../ai/AiGate';
 import { AiError, aiRequest, toJpegDataUrl, toLookRender } from '../ai/client';
-import { autoPlace, refit } from '../canvas/autoPlace';
+import { autoPlace, refit, refitAll } from '../canvas/autoPlace';
 import { renderLook } from '../canvas/exportLook';
 import { getBlob } from '../db/blobs';
 import { normalizeDeg } from '../canvas/gesture';
@@ -215,7 +215,14 @@ export function TryOnScreen() {
     const next = await refit(sel, g, doll);
     update(items.map((i) => (i.id === sel.id ? next : i)));
   };
-  const switchDoll = (id: ID) => { setDollId(id); persist(items, id); };
+  const switchDoll = async (id: ID) => {
+    const next = dolls.find((d) => d.id === id);
+    if (!next || next.id === doll.id) return;
+    setDollId(id);
+    const fitted = await refitAll(items, (gid) => garments.get(gid), next);
+    setItems(fitted);
+    persist(fitted, id);
+  };
 
   const saveLook = async () => {
     if (!stageRef.current || items.length === 0) { toast(he.looks.needItems); return; }
@@ -256,11 +263,21 @@ export function TryOnScreen() {
           doll={doll} items={items} garments={garments}
           selectedId={selectedId} onSelect={setSelectedId} onChange={update} stageRef={stageRef}
         />
+        <div className="absolute start-3 top-2 flex flex-col items-start gap-2">
+          {doll.starter || doll.name === he.starter.dollName ? (
+            <Link to="/import/doll" className="flex min-h-11 items-center rounded-full bg-rose px-4 text-sm text-white shadow-md">
+              {he.tryon.addMyPhoto}
+            </Link>
+          ) : (
+            <Link to="/dolls" className="flex min-h-11 items-center rounded-full bg-paper/90 px-4 text-sm text-muted shadow">
+              {he.tryon.changeDoll}
+            </Link>
+          )}
         {dolls.length > 1 && (
-          <div className="absolute start-3 top-2 flex flex-col gap-2" role="group" aria-label={he.dolls.choose}>
+          <div className="flex flex-col gap-2" role="group" aria-label={he.dolls.choose}>
             {dolls.map((d) => (
               <button
-                key={d.id} onClick={() => switchDoll(d.id)} aria-label={d.name} aria-pressed={d.id === doll.id}
+                key={d.id} onClick={() => void switchDoll(d.id)} aria-label={d.name} aria-pressed={d.id === doll.id}
                 className={`h-12 w-12 overflow-hidden rounded-full border-2 bg-paper p-0.5 ${d.id === doll.id ? 'border-rose' : 'border-line'}`}
               >
                 <Thumb blob={d.thumb} alt="" />
@@ -268,6 +285,7 @@ export function TryOnScreen() {
             ))}
           </div>
         )}
+        </div>
         {items.length === 0 && !drawer && (
           <div className="absolute inset-x-4 bottom-4 space-y-2 rounded-3xl bg-paper/95 p-4 text-center shadow-lg">
             <p className="font-serif text-lg">{he.guide.nextTitle}</p>

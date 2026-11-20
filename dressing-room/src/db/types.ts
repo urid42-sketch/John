@@ -19,6 +19,8 @@ export interface Doll {
   source: BlobRef; mask: BlobRef; cutout: BlobRef; thumb: BlobRef;
   w: number; h: number; // cutout pixel size
   calibration?: BodyCalibration;
+  /** the built-in shop mannequin (not a photo) */
+  starter?: boolean;
 }
 
 export type Category = 'dress' | 'top' | 'pants' | 'skirt' | 'shoes' | 'accessory';

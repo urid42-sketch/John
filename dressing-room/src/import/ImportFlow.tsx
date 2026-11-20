@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { detectCalibration } from '../canvas/autoPlace';
+import { detectCalibration, moveDraftTo } from '../canvas/autoPlace';
 import { addDoll, addGarment, type GarmentMeta } from '../db/repo';
 import { requestPersist } from '../db/storage';
 import { he } from '../i18n/he';
@@ -73,7 +73,8 @@ export function ImportFlow() {
       const cut = await buildCutout(cropped.current, mask.current);
       if (kind === 'doll') {
         // read shoulders / waist / hips straight from the cutout, so garments land on her body
-        await addDoll(dollName.trim() || he.dolls.defaultName, cut, (await detectCalibration(cut.cutout)) ?? undefined);
+        const doll = await addDoll(dollName.trim() || he.dolls.defaultName, cut, (await detectCalibration(cut.cutout)) ?? undefined);
+        await moveDraftTo(doll).catch((e) => console.error(e));
         void requestPersist();
         nav('/', { replace: true });
       } else {

@@ -1,7 +1,7 @@
 import { getBlob } from '../db/blobs';
-import { getDraft, newPlacedItem, updateDollCalibration } from '../db/repo';
+import { getDraft, newPlacedItem, saveDraft, updateDollCalibration } from '../db/repo';
 import { db } from '../db/schema';
-import type { BlobRef, BodyCalibration, Doll, Garment, PlacedItem } from '../db/types';
+import type { BlobRef, BodyCalibration, Doll, Garment, ID, PlacedItem } from '../db/types';
 import { autoCalibrate, fitGarment, type AlphaMap } from '../engine/autoFit';
 import { DEFAULT_CALIBRATION, deriveBody } from '../engine/body';
 import { ctx2d, decodeToCanvas, releaseCanvas } from '../imaging/load';
@@ -70,4 +70,21 @@ export async function addToDraftFitted(g: Garment): Promise<void> {
     const cur = await getDraft();
     await db.looks.put({ ...cur, items: [...cur.items, { ...item, z: cur.items.reduce((m, i) => Math.max(m, i.z), 0) + 1 }], updatedAt: Date.now() });
   });
+}
+
+/** Re-fit every placed item onto another doll (items whose garment is gone are kept as they are). */
+export async function refitAll(items: PlacedItem[], garmentOf: (id: ID) => Garment | undefined, doll: Doll): Promise<PlacedItem[]> {
+  return Promise.all(items.map(async (it) => {
+    const g = garmentOf(it.garmentId);
+    if (!g) return it;
+    try { return await refit(it, g, doll); } catch (e) { console.error(e); return it; }
+  }));
+}
+
+/** After a new photo is added: the saved session moves to it and its clothes are fitted to her body. */
+export async function moveDraftTo(doll: Doll): Promise<void> {
+  const d = await getDraft();
+  const garments = new Map((await db.garments.bulkGet(d.items.map((i) => i.garmentId))).filter((g): g is Garment => !!g).map((g) => [g.id, g]));
+  const items = await refitAll(d.items, (id) => garments.get(id), doll);
+  await saveDraft(doll.id, items);
 }

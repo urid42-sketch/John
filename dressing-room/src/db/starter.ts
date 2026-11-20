@@ -17,10 +17,12 @@ export async function addMannequinDoll(): Promise<Doll> {
   try {
     const [png, th] = await Promise.all([canvasToBlob(c, 'image/png'), canvasToBlob(thumb, 'image/png')]);
     // untrimmed on purpose: the canonical landmarks then apply as they are
-    return await addDoll(he.starter.dollName, {
+    const d = await addDoll(he.starter.dollName, {
       source: png, sourceW: c.width, sourceH: c.height, mask: png, cutout: png, w: c.width, h: c.height,
       thumb: th, thumbW: thumb.width, thumbH: thumb.height,
     }, CANONICAL_CALIBRATION);
+    await db.dolls.update(d.id, { starter: true });
+    return { ...d, starter: true };
   } finally { releaseCanvas(c); releaseCanvas(thumb); }
 }
 

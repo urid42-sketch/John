@@ -19,6 +19,9 @@ What exists (deviations from ARCHITECTURE.md are deliberate):
   testing (`canvas/gesture.ts`), no Konva Transformer. Closet backdrop = `public/closet.jpg` via CSS `.closet-bg`;
   `canvas/exportLook.ts` draws it into exported looks.
 - Bg removal: `imaging/bgRemoval.ts`, serialized, consent before the first 80MB download, crash guard.
+- SWITCHING FIGURE: try-on shows "📷 לשים תמונה של איה" while on the mannequin (`Doll.starter`, or its name) and
+  "החלפת דמות" (→ /dolls) otherwise. A newly added photo becomes the main doll; `moveDraftTo` (canvas/autoPlace.ts)
+  moves the session to it and refits the clothes; switching dolls on the stage also refits (`refitAll`).
 - EASE OF USE (user asked: "not understandable", make it friendlier and more professional): instant start without a
   photo (`db/starter.ts`: shop-mannequin doll + five sample garments made by the studio engine), a "what next" card on
   an empty try-on stage, `/help` screen (`screens/HelpScreen.tsx`, texts in `he.guide`), after saving a design a sheet

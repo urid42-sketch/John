@@ -27,14 +27,15 @@ async function cutoutBlobs(ownerId: ID, c: CutoutResult, displayRole: 'cutout' |
 export async function addDoll(name: string, c: CutoutResult, calibration?: Doll['calibration']): Promise<Doll> {
   const id = crypto.randomUUID();
   const b = await cutoutBlobs(id, c, 'cutout');
-  const first = (await db.dolls.count()) === 0;
+  // the newest photo becomes the main doll (the try-on moves to it: moveDraftTo)
   const doll: Doll = {
-    id, name, createdAt: Date.now(), isDefault: first,
+    id, name, createdAt: Date.now(), isDefault: true,
     source: b.source.id, mask: b.mask.id, cutout: b.display.id, thumb: b.thumb.id, w: c.w, h: c.h,
     ...(calibration ? { calibration } : {}),
   };
   await db.transaction('rw', db.dolls, db.blobs, async () => {
     await db.blobs.bulkAdd([b.source, b.mask, b.display, b.thumb]);
+    await db.dolls.toCollection().modify((d) => { d.isDefault = false; });
     await db.dolls.add(doll);
   });
   return doll;
